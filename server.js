@@ -157,10 +157,59 @@ app.post('/api/mcp', (req, res) => {
         }
     });
 
-    // Send the prompt to the MCP process's standard input
-    console.log(`Writing prompt to MCP stdin: ${prompt}`);
-    mcpProcess.stdin.write(prompt + '\n');
-    mcpProcess.stdin.end(); // Close the input stream to signal we're done
+    // MCP protocol: First initialize the connection
+    const initRequest = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+            protocolVersion: "2024-11-05",
+            capabilities: {
+                tools: {}
+            },
+            clientInfo: {
+                name: "canva-mcp-proxy",
+                version: "1.0.0"
+            }
+        }
+    };
+
+    console.log(`Initializing MCP connection:`, JSON.stringify(initRequest));
+    mcpProcess.stdin.write(JSON.stringify(initRequest) + '\n');
+
+    // Wait a moment then send the actual request
+    setTimeout(() => {
+        const toolRequest = {
+            jsonrpc: "2.0",
+            id: 2,
+            method: "tools/list"
+        };
+        
+        console.log(`Listing available tools:`, JSON.stringify(toolRequest));
+        mcpProcess.stdin.write(JSON.stringify(toolRequest) + '\n');
+        
+        // Send a simple prompt request
+        setTimeout(() => {
+            const promptRequest = {
+                jsonrpc: "2.0",
+                id: 3,
+                method: "completion/complete",
+                params: {
+                    ref: {
+                        type: "prompt",
+                        name: "help"
+                    },
+                    argument: {
+                        query: prompt
+                    }
+                }
+            };
+            
+            console.log(`Sending prompt request:`, JSON.stringify(promptRequest));
+            mcpProcess.stdin.write(JSON.stringify(promptRequest) + '\n');
+            mcpProcess.stdin.end();
+        }, 100);
+    }, 100);
 });
 
 app.listen(PORT, () => {
