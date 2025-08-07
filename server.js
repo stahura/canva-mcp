@@ -1,7 +1,53 @@
 const express = require('express');
 const { spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 
 const app = express();
+
+// Function to ensure Canva CLI credentials exist
+function ensureCanvaCredentials() {
+    const credentialsDir = path.join(os.homedir(), '.canva-cli');
+    const credentialsFile = path.join(credentialsDir, 'credentials');
+    
+    // Check if credentials already exist
+    if (fs.existsSync(credentialsFile)) {
+        console.log('Canva credentials already exist');
+        return;
+    }
+    
+    // Create credentials from environment variable if available
+    const credentialsDataBase64 = process.env.CANVA_CREDENTIALS_BASE64;
+    const credentialsDataRaw = process.env.CANVA_CREDENTIALS;
+    
+    if (credentialsDataBase64 || credentialsDataRaw) {
+        try {
+            // Create directory if it doesn't exist
+            if (!fs.existsSync(credentialsDir)) {
+                fs.mkdirSync(credentialsDir, { recursive: true });
+            }
+            
+            // Decode credentials data
+            let credentialsData;
+            if (credentialsDataBase64) {
+                credentialsData = Buffer.from(credentialsDataBase64, 'base64').toString('utf8');
+                console.log('Using base64 encoded credentials');
+            } else {
+                credentialsData = credentialsDataRaw;
+                console.log('Using raw credentials');
+            }
+            
+            // Write credentials file
+            fs.writeFileSync(credentialsFile, credentialsData);
+            console.log('Canva credentials created from environment variable');
+        } catch (error) {
+            console.error('Failed to create credentials file:', error);
+        }
+    } else {
+        console.log('No CANVA_CREDENTIALS_BASE64 or CANVA_CREDENTIALS environment variable found');
+    }
+}
 app.use(express.json()); // Middleware to parse JSON bodies
 
 // Add CORS headers to allow browser requests
@@ -33,9 +79,14 @@ app.post('/api/mcp', (req, res) => {
         return res.status(400).json({ error: 'Prompt is required' });
     }
 
+    console.log("Ensuring Canva credentials exist...");
+    ensureCanvaCredentials();
+
     console.log("Starting Canva MCP process...");
     // This is the command from the Canva docs to run the server
-    const mcpProcess = spawn('npx', ['-y', '@canva/cli@latest', 'mcp']);
+    const mcpProcess = spawn('npx', ['-y', '@canva/cli@latest', 'mcp'], {
+        env: { ...process.env, NODE_ENV: 'production' }
+    });
 
     let responseData = '';
     let errorData = '';
