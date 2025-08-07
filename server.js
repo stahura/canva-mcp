@@ -83,8 +83,8 @@ app.post('/api/mcp', (req, res) => {
     ensureCanvaCredentials();
 
     console.log("Starting Canva MCP process...");
-    // This is the command from the Canva docs to run the server
-    const mcpProcess = spawn('npx', ['-y', '@canva/cli@latest', 'mcp'], {
+    // Use the actual Canva MCP server (not the dev documentation server)
+    const mcpProcess = spawn('npx', ['-y', 'mcp-remote@latest', 'https://mcp.canva.com/mcp'], {
         env: { ...process.env, NODE_ENV: 'production' }
     });
 
@@ -188,48 +188,54 @@ app.post('/api/mcp', (req, res) => {
         console.log(`Listing available tools:`, JSON.stringify(toolRequest));
         mcpProcess.stdin.write(JSON.stringify(toolRequest) + '\n');
         
-        // Use the appropriate tool based on the user's request
+        // Use the appropriate tool from the actual Canva MCP server
         setTimeout(() => {
             let toolRequest;
             
-            // If asking about design/creation, use the design guidelines
+            // If asking about design/creation, try to generate a design
             if (prompt.toLowerCase().includes('design') || prompt.toLowerCase().includes('create')) {
                 toolRequest = {
                     jsonrpc: "2.0",
                     id: 3,
                     method: "tools/call",
                     params: {
-                        name: "read-canva-apps-sdk-design-guidelines",
-                        arguments: {}
+                        name: "generate-design",
+                        arguments: {
+                            query: prompt
+                        }
                     }
                 };
             } 
-            // If asking about app development, use the documentation
-            else if (prompt.toLowerCase().includes('app') || prompt.toLowerCase().includes('sdk')) {
+            // If asking about search, use search-designs
+            else if (prompt.toLowerCase().includes('search') || prompt.toLowerCase().includes('find')) {
                 toolRequest = {
                     jsonrpc: "2.0",
                     id: 3,
                     method: "tools/call",
                     params: {
-                        name: "read-canva-apps-sdk-documentation-index",
-                        arguments: {}
+                        name: "search-designs",
+                        arguments: {
+                            query: prompt
+                        }
                     }
                 };
             }
-            // Default to create app instructions for general requests
+            // Default to generate-design for general requests
             else {
                 toolRequest = {
                     jsonrpc: "2.0",
                     id: 3,
                     method: "tools/call",
                     params: {
-                        name: "create-canva-app-instructions",
-                        arguments: {}
+                        name: "generate-design",
+                        arguments: {
+                            query: prompt
+                        }
                     }
                 };
             }
             
-            console.log(`Calling MCP tool:`, JSON.stringify(toolRequest));
+            console.log(`Calling Canva MCP tool:`, JSON.stringify(toolRequest));
             mcpProcess.stdin.write(JSON.stringify(toolRequest) + '\n');
             mcpProcess.stdin.end();
         }, 100);
