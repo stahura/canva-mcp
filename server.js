@@ -103,21 +103,63 @@ app.post('/api/mcp', (req, res) => {
         console.error(`MCP stderr: ${data}`);
     });
 
-    // When the process closes, send the response back to your client
-    mcpProcess.on('close', (code) => {
-        console.log(`MCP process exited with code ${code}`);
-        if (code !== 0 || errorData) {
-            return res.status(500).json({ 
-                error: 'MCP process failed.', 
-                details: errorData 
+    // Set a timeout for the MCP process
+    const timeout = setTimeout(() => {
+        console.log('MCP process timeout, killing process');
+        mcpProcess.kill();
+        if (!res.headersSent) {
+            res.status(408).json({ 
+                error: 'MCP process timeout',
+                details: 'Process took too long to respond',
+                partialResponse: responseData,
+                partialError: errorData
             });
         }
-        res.json({ response: responseData });
+    }, 30000); // 30 second timeout
+
+    // When the process closes, send the response back to your client
+    mcpProcess.on('close', (code) => {
+        clearTimeout(timeout);
+        console.log(`MCP process exited with code ${code}`);
+        console.log(`Response data length: ${responseData.length}`);
+        console.log(`Error data length: ${errorData.length}`);
+        
+        if (!res.headersSent) {
+            if (code !== 0) {
+                return res.status(500).json({ 
+                    error: 'MCP process failed.', 
+                    exitCode: code,
+                    details: errorData || 'No error details available',
+                    partialResponse: responseData
+                });
+            }
+            
+            // Return success even if no response data (MCP might not produce output for some commands)
+            res.json({ 
+                success: true,
+                response: responseData || 'MCP process completed successfully',
+                exitCode: code,
+                hasError: errorData.length > 0,
+                errorDetails: errorData
+            });
+        }
+    });
+
+    // Handle process errors
+    mcpProcess.on('error', (error) => {
+        clearTimeout(timeout);
+        console.error('MCP process error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({
+                error: 'Failed to start MCP process',
+                details: error.message
+            });
+        }
     });
 
     // Send the prompt to the MCP process's standard input
     console.log(`Writing prompt to MCP stdin: ${prompt}`);
-    mcpProcess.stdin.write(prompt);
+    mcpProcess.stdin.write(prompt + '\n');
     mcpProcess.stdin.end(); // Close the input stream to signal we're done
 });
 
