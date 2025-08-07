@@ -286,8 +286,17 @@
                                     <strong>Redirect URI:</strong> ${data.redirectUri || 'N/A'}
                                 </p>
                                 <p style="font-size: 12px; color: #888; margin-top: 15px;">
-                                    After authorizing, you may need to try your request again.
+                                    After authorizing, <strong>try your request again</strong> - the server should now be authenticated.
                                 </p>
+                                <button onclick="document.getElementById('promptInput').focus()" style="
+                                    background: #28a745;
+                                    color: white;
+                                    padding: 8px 16px;
+                                    border: none;
+                                    border-radius: 4px;
+                                    cursor: pointer;
+                                    margin-top: 10px;
+                                ">↩️ Try Request Again</button>
                             </div>
                         `;
                         responseDiv.className = 'response-box';

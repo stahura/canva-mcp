@@ -71,6 +71,49 @@ app.get('/', (req, res) => {
     res.json({ status: 'OK', message: 'Canva MCP Proxy Server is running' });
 });
 
+// OAuth callback endpoint to handle Canva authorization
+app.get('/oauth/callback', (req, res) => {
+    const { code, state } = req.query;
+    
+    if (!code) {
+        return res.status(400).json({ 
+            error: 'No authorization code received',
+            message: 'The OAuth callback did not include an authorization code.'
+        });
+    }
+
+    console.log(`Received OAuth callback - Code: ${code}, State: ${state}`);
+    
+    // Store the authorization code temporarily (in a real app, you'd use Redis or similar)
+    global.oauthCode = code;
+    global.oauthState = state;
+    
+    // Return a success page
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Authorization Successful</title>
+            <style>
+                body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; text-align: center; }
+                .success { background: #d4edda; border: 2px solid #c3e6cb; padding: 20px; border-radius: 8px; }
+                .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; margin: 10px 0; }
+                .button { background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+            </style>
+        </head>
+        <body>
+            <div class="success">
+                <h2>🎉 Authorization Successful!</h2>
+                <p>You have successfully authorized the Canva MCP server.</p>
+                <div class="code">Authorization Code: ${code}</div>
+                <p>You can now close this tab and return to your application to make requests.</p>
+                <button class="button" onclick="window.close()">Close Tab</button>
+            </div>
+        </body>
+        </html>
+    `);
+});
+
 // This is the API endpoint your client will hit
 app.post('/api/mcp', (req, res) => {
     const { prompt } = req.body;
@@ -84,6 +127,9 @@ app.post('/api/mcp', (req, res) => {
 
     console.log("Starting Canva MCP process...");
     // Use the actual Canva MCP server (not the dev documentation server)
+    // Determine the base URL for OAuth redirect
+    const baseUrl = req.get('host') ? `https://${req.get('host')}` : 'http://localhost:3000';
+    
     // Set up environment for OAuth authentication
     const mcpEnv = {
         ...process.env,
@@ -92,6 +138,8 @@ app.post('/api/mcp', (req, res) => {
         CANVA_ACCESS_TOKEN: process.env.CANVA_ACCESS_TOKEN,
         CANVA_CLIENT_ID: process.env.CANVA_CLIENT_ID,
         CANVA_CLIENT_SECRET: process.env.CANVA_CLIENT_SECRET,
+        // Set the OAuth redirect URI to our Railway server
+        OAUTH_REDIRECT_URI: `${baseUrl}/oauth/callback`,
         // Disable interactive authentication
         CI: 'true',
         NO_BROWSER: 'true',
@@ -122,8 +170,14 @@ app.post('/api/mcp', (req, res) => {
         // Check for OAuth authorization URL
         const authUrlMatch = dataStr.match(/Please authorize this client by visiting:\s*(https?:\/\/[^\s]+)/);
         if (authUrlMatch) {
-            const authUrl = authUrlMatch[1];
+            let authUrl = authUrlMatch[1];
             console.log(`Found OAuth URL: ${authUrl}`);
+            
+            // Replace localhost redirect URI with our Railway server URL
+            const baseUrl = req.get('host') ? `https://${req.get('host')}` : 'http://localhost:3000';
+            const railwayCallbackUrl = encodeURIComponent(`${baseUrl}/oauth/callback`);
+            authUrl = authUrl.replace(/redirect_uri=[^&]+/, `redirect_uri=${railwayCallbackUrl}`);
+            console.log(`Modified OAuth URL: ${authUrl}`);
             
             // Immediately return the OAuth URL to the frontend
             clearTimeout(timeout);
