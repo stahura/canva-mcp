@@ -188,25 +188,49 @@ app.post('/api/mcp', (req, res) => {
         console.log(`Listing available tools:`, JSON.stringify(toolRequest));
         mcpProcess.stdin.write(JSON.stringify(toolRequest) + '\n');
         
-        // Send a simple prompt request
+        // Use the appropriate tool based on the user's request
         setTimeout(() => {
-            const promptRequest = {
-                jsonrpc: "2.0",
-                id: 3,
-                method: "completion/complete",
-                params: {
-                    ref: {
-                        type: "prompt",
-                        name: "help"
-                    },
-                    argument: {
-                        query: prompt
-                    }
-                }
-            };
+            let toolRequest;
             
-            console.log(`Sending prompt request:`, JSON.stringify(promptRequest));
-            mcpProcess.stdin.write(JSON.stringify(promptRequest) + '\n');
+            // If asking about design/creation, use the design guidelines
+            if (prompt.toLowerCase().includes('design') || prompt.toLowerCase().includes('create')) {
+                toolRequest = {
+                    jsonrpc: "2.0",
+                    id: 3,
+                    method: "tools/call",
+                    params: {
+                        name: "read-canva-apps-sdk-design-guidelines",
+                        arguments: {}
+                    }
+                };
+            } 
+            // If asking about app development, use the documentation
+            else if (prompt.toLowerCase().includes('app') || prompt.toLowerCase().includes('sdk')) {
+                toolRequest = {
+                    jsonrpc: "2.0",
+                    id: 3,
+                    method: "tools/call",
+                    params: {
+                        name: "read-canva-apps-sdk-documentation-index",
+                        arguments: {}
+                    }
+                };
+            }
+            // Default to create app instructions for general requests
+            else {
+                toolRequest = {
+                    jsonrpc: "2.0",
+                    id: 3,
+                    method: "tools/call",
+                    params: {
+                        name: "create-canva-app-instructions",
+                        arguments: {}
+                    }
+                };
+            }
+            
+            console.log(`Calling MCP tool:`, JSON.stringify(toolRequest));
+            mcpProcess.stdin.write(JSON.stringify(toolRequest) + '\n');
             mcpProcess.stdin.end();
         }, 100);
     }, 100);
