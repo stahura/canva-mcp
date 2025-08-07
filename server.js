@@ -113,10 +113,31 @@ app.post('/api/mcp', (req, res) => {
         console.log(`MCP stdout: ${data}`);
     });
 
-    // Listen for any errors
+    // Listen for any errors and extract OAuth URLs
     mcpProcess.stderr.on('data', (data) => {
-        errorData += data.toString();
-        console.error(`MCP stderr: ${data}`);
+        const dataStr = data.toString();
+        errorData += dataStr;
+        console.error(`MCP stderr: ${dataStr}`);
+        
+        // Check for OAuth authorization URL
+        const authUrlMatch = dataStr.match(/Please authorize this client by visiting:\s*(https?:\/\/[^\s]+)/);
+        if (authUrlMatch) {
+            const authUrl = authUrlMatch[1];
+            console.log(`Found OAuth URL: ${authUrl}`);
+            
+            // Immediately return the OAuth URL to the frontend
+            clearTimeout(timeout);
+            if (!res.headersSent) {
+                return res.status(200).json({
+                    requiresAuth: true,
+                    authUrl: authUrl,
+                    message: 'Authentication required. Please click the link to authorize.',
+                    instructions: 'Click the authorization URL to authenticate with Canva, then try your request again.',
+                    clientId: authUrl.match(/client_id=([^&]+)/)?.[1],
+                    redirectUri: decodeURIComponent(authUrl.match(/redirect_uri=([^&]+)/)?.[1] || '')
+                });
+            }
+        }
     });
 
     // Set a timeout for the MCP process
