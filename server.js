@@ -71,15 +71,86 @@ app.get('/', (req, res) => {
     res.json({ status: 'OK', message: 'Canva MCP Proxy Server is running' });
 });
 
+// Test endpoint to check OAuth URL validity
+app.get('/test-oauth-url', async (req, res) => {
+    const { url } = req.query;
+    if (!url) {
+        return res.status(400).json({ error: 'URL parameter required' });
+    }
+    
+    try {
+        const fetch = (await import('node-fetch')).default;
+        const response = await fetch(url, { method: 'HEAD' });
+        res.json({
+            url: url,
+            status: response.status,
+            statusText: response.statusText,
+            headers: Object.fromEntries(response.headers.entries())
+        });
+    } catch (error) {
+        res.json({
+            url: url,
+            error: error.message,
+            type: error.constructor.name
+        });
+    }
+});
+
 // OAuth callback endpoint to handle Canva authorization
 app.get('/oauth/callback', (req, res) => {
-    const { code, state } = req.query;
+    const { code, state, error, error_description } = req.query;
+    
+    console.log(`OAuth callback received:`, { code: !!code, state, error, error_description, fullQuery: req.query });
+    
+    if (error) {
+        return res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Authorization Error</title>
+                <style>
+                    body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; text-align: center; }
+                    .error { background: #f8d7da; border: 2px solid #f5c6cb; padding: 20px; border-radius: 8px; }
+                    .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; margin: 10px 0; }
+                    .button { background: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+                </style>
+            </head>
+            <body>
+                <div class="error">
+                    <h2>❌ Authorization Failed</h2>
+                    <p><strong>Error:</strong> ${error}</p>
+                    ${error_description ? `<p><strong>Description:</strong> ${error_description}</p>` : ''}
+                    <p>Please try the authorization process again or contact support.</p>
+                    <button class="button" onclick="window.close()">Close Tab</button>
+                </div>
+            </body>
+            </html>
+        `);
+    }
     
     if (!code) {
-        return res.status(400).json({ 
-            error: 'No authorization code received',
-            message: 'The OAuth callback did not include an authorization code.'
-        });
+        return res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Authorization Issue</title>
+                <style>
+                    body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; text-align: center; }
+                    .warning { background: #fff3cd; border: 2px solid #ffeaa7; padding: 20px; border-radius: 8px; }
+                    .debug { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; margin: 10px 0; text-align: left; }
+                </style>
+            </head>
+            <body>
+                <div class="warning">
+                    <h2>⚠️ No Authorization Code Received</h2>
+                    <p>The OAuth callback did not include an authorization code.</p>
+                    <div class="debug">Query Parameters: ${JSON.stringify(req.query, null, 2)}</div>
+                    <p>This might indicate an issue with the Canva authorization server or the OAuth flow.</p>
+                    <button onclick="window.close()">Close Tab</button>
+                </div>
+            </body>
+            </html>
+        `);
     }
 
     console.log(`Received OAuth callback - Code: ${code}, State: ${state}`);
