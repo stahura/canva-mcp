@@ -100,28 +100,87 @@ async function handleOAuthWithBrowser(authUrl) {
         // Wait for the page to load and look for authorization elements
         await page.waitForTimeout(2000);
         
-        // Look for common OAuth authorization buttons/elements
-        const authSelectors = [
-            'button[type="submit"]',
-            'input[type="submit"]',
-            'button:contains("Allow")',
-            'button:contains("Authorize")',
-            'button:contains("Accept")',
-            '[data-testid="authorize"]',
-            '.auth-button',
-            '.authorize-button'
-        ];
+        // Debug: Log page title and URL
+        const pageTitle = await page.title();
+        const currentUrl = page.url();
+        console.log(`Page loaded - Title: "${pageTitle}", URL: ${currentUrl}`);
         
+        // Debug: Log all buttons on the page
+        try {
+            const buttonInfo = await page.evaluate(() => {
+                const buttons = Array.from(document.querySelectorAll('button'));
+                return buttons.map((button, index) => ({
+                    index,
+                    text: (button.textContent || button.innerText || '').trim(),
+                    classes: button.className,
+                    type: button.type,
+                    id: button.id
+                }));
+            });
+            console.log('Found buttons on page:', JSON.stringify(buttonInfo, null, 2));
+        } catch (e) {
+            console.log('Could not enumerate buttons:', e.message);
+        }
+        
+        // Look for Canva-specific OAuth authorization buttons
         let authButton = null;
-        for (const selector of authSelectors) {
+        
+        // Try Canva-specific class combination first
+        try {
+            const canvaButton = await page.$('button._5KATa.LQzFZw.VgvqKQ._8ERLTg');
+            if (canvaButton) {
+                console.log('Found Canva-specific authorization button');
+                authButton = canvaButton;
+            }
+        } catch (e) {
+            console.log('Canva-specific selector failed, trying alternatives...');
+        }
+        
+        // If that didn't work, search for buttons containing "Allow" text
+        if (!authButton) {
             try {
-                authButton = await page.$(selector);
-                if (authButton) {
-                    console.log(`Found authorization button with selector: ${selector}`);
-                    break;
+                authButton = await page.evaluateHandle(() => {
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    return buttons.find(button => {
+                        const text = button.textContent || button.innerText || '';
+                        return text.toLowerCase().includes('allow') || 
+                               text.toLowerCase().includes('authorize') || 
+                               text.toLowerCase().includes('accept');
+                    });
+                });
+                
+                if (authButton && await authButton.asElement()) {
+                    console.log('Found authorization button by text content');
+                    authButton = await authButton.asElement();
+                } else {
+                    authButton = null;
                 }
             } catch (e) {
-                // Continue to next selector
+                console.log('Text-based search failed:', e.message);
+                authButton = null;
+            }
+        }
+        
+        // Final fallback: try common selectors
+        if (!authButton) {
+            const fallbackSelectors = [
+                'button[type="submit"]',
+                'input[type="submit"]',
+                '[data-testid="authorize"]',
+                '.auth-button',
+                '.authorize-button'
+            ];
+            
+            for (const selector of fallbackSelectors) {
+                try {
+                    authButton = await page.$(selector);
+                    if (authButton) {
+                        console.log(`Found authorization button with fallback selector: ${selector}`);
+                        break;
+                    }
+                } catch (e) {
+                    // Continue to next selector
+                }
             }
         }
         
