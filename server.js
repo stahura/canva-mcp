@@ -6,6 +6,11 @@ app.use(express.json()); // Middleware to parse JSON bodies
 
 const PORT = process.env.PORT || 3000;
 
+// Health check endpoint
+app.get('/', (req, res) => {
+    res.json({ status: 'OK', message: 'Canva MCP Proxy Server is running' });
+});
+
 // This is the API endpoint your client will hit
 app.post('/api/mcp', (req, res) => {
     const { prompt } = req.body;
