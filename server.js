@@ -209,6 +209,9 @@ app.post('/api/mcp', (req, res) => {
         CANVA_ACCESS_TOKEN: process.env.CANVA_ACCESS_TOKEN,
         CANVA_CLIENT_ID: process.env.CANVA_CLIENT_ID,
         CANVA_CLIENT_SECRET: process.env.CANVA_CLIENT_SECRET,
+        // Keep existing credentials approach as fallback
+        CANVA_CREDENTIALS_BASE64: process.env.CANVA_CREDENTIALS_BASE64,
+        CANVA_CREDENTIALS: process.env.CANVA_CREDENTIALS,
         // Set the OAuth redirect URI to our Railway server
         OAUTH_REDIRECT_URI: `${baseUrl}/oauth/callback`,
         // Disable interactive authentication
