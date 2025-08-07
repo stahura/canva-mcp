@@ -4,6 +4,20 @@ const { spawn } = require('child_process');
 const app = express();
 app.use(express.json()); // Middleware to parse JSON bodies
 
+// Add CORS headers to allow browser requests
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+        res.sendStatus(200);
+    } else {
+        next();
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 
 // Health check endpoint
