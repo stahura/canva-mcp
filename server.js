@@ -3,6 +3,7 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const puppeteer = require('puppeteer');
 
 const app = express();
 
@@ -65,6 +66,113 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
+
+// Function to handle OAuth flow with headless browser
+async function handleOAuthWithBrowser(authUrl) {
+    let browser = null;
+    try {
+        console.log('Starting headless browser for OAuth flow...');
+        
+        browser = await puppeteer.launch({
+            headless: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process',
+                '--disable-gpu'
+            ]
+        });
+        
+        const page = await browser.newPage();
+        
+        // Set user agent to avoid bot detection
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+        
+        console.log(`Navigating to OAuth URL: ${authUrl}`);
+        
+        // Navigate to the OAuth authorization URL
+        await page.goto(authUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+        
+        // Wait for the page to load and look for authorization elements
+        await page.waitForTimeout(2000);
+        
+        // Look for common OAuth authorization buttons/elements
+        const authSelectors = [
+            'button[type="submit"]',
+            'input[type="submit"]',
+            'button:contains("Allow")',
+            'button:contains("Authorize")',
+            'button:contains("Accept")',
+            '[data-testid="authorize"]',
+            '.auth-button',
+            '.authorize-button'
+        ];
+        
+        let authButton = null;
+        for (const selector of authSelectors) {
+            try {
+                authButton = await page.$(selector);
+                if (authButton) {
+                    console.log(`Found authorization button with selector: ${selector}`);
+                    break;
+                }
+            } catch (e) {
+                // Continue to next selector
+            }
+        }
+        
+        if (authButton) {
+            console.log('Clicking authorization button...');
+            await authButton.click();
+            
+            // Wait for redirect and capture the callback URL
+            await page.waitForTimeout(3000);
+            
+            // Check if we got redirected to a callback URL
+            const currentUrl = page.url();
+            console.log(`Current URL after authorization: ${currentUrl}`);
+            
+            // Look for callback URL with authorization code
+            if (currentUrl.includes('code=')) {
+                console.log('Authorization successful! Callback URL captured.');
+                return { success: true, callbackUrl: currentUrl };
+            }
+        }
+        
+        // If we get here, try to extract any callback URL from the page
+        const currentUrl = page.url();
+        if (currentUrl.includes('code=')) {
+            return { success: true, callbackUrl: currentUrl };
+        }
+        
+        // Take a screenshot for debugging
+        const screenshot = await page.screenshot({ encoding: 'base64' });
+        console.log('OAuth flow did not complete as expected');
+        
+        return { 
+            success: false, 
+            error: 'Could not complete OAuth authorization automatically',
+            currentUrl: currentUrl,
+            screenshot: `data:image/png;base64,${screenshot}`
+        };
+        
+    } catch (error) {
+        console.error('Error in headless browser OAuth flow:', error);
+        return { 
+            success: false, 
+            error: error.message,
+            details: 'Headless browser automation failed'
+        };
+    } finally {
+        if (browser) {
+            await browser.close();
+        }
+    }
+}
 
 // Health check endpoint
 app.get('/', (req, res) => {
@@ -334,16 +442,43 @@ app.post('/api/mcp', (req, res) => {
             
             console.log(`Final modified OAuth URL: ${authUrl}`);
             
-            // Immediately return the OAuth URL to the frontend
+            // Clear the timeout and handle OAuth with headless browser
             clearTimeout(timeout);
+            
             if (!res.headersSent) {
-                return res.status(200).json({
-                    requiresAuth: true,
-                    authUrl: authUrl,
-                    message: 'Authentication required. Please click the link to authorize.',
-                    instructions: 'Click the authorization URL to authenticate with Canva, then try your request again.',
-                    clientId: authUrl.match(/client_id=([^&]+)/)?.[1],
-                    redirectUri: decodeURIComponent(authUrl.match(/redirect_uri=([^&]+)/)?.[1] || '')
+                console.log('Starting automated OAuth flow with headless browser...');
+                
+                // Return immediate response indicating automation is in progress
+                res.status(200).json({
+                    automating: true,
+                    message: 'Automating OAuth flow with headless browser...',
+                    instructions: 'Please wait while we automatically handle the authorization process.',
+                    authUrl: authUrl
+                });
+                
+                // Handle OAuth automation asynchronously
+                handleOAuthWithBrowser(authUrl).then(result => {
+                    if (result.success) {
+                        console.log('Headless browser OAuth completed successfully!');
+                        // Extract the authorization code from the callback URL
+                        try {
+                            const callbackUrl = new URL(result.callbackUrl);
+                            const code = callbackUrl.searchParams.get('code');
+                            const state = callbackUrl.searchParams.get('state');
+                            
+                            if (code) {
+                                global.oauthCode = code;
+                                global.oauthState = state;
+                                console.log(`OAuth code stored: ${code}`);
+                            }
+                        } catch (e) {
+                            console.error('Error parsing callback URL from browser:', e);
+                        }
+                    } else {
+                        console.error('Headless browser OAuth failed:', result.error);
+                    }
+                }).catch(error => {
+                    console.error('Headless browser OAuth error:', error);
                 });
             }
         }
