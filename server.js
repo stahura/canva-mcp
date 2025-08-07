@@ -84,8 +84,24 @@ app.post('/api/mcp', (req, res) => {
 
     console.log("Starting Canva MCP process...");
     // Use the actual Canva MCP server (not the dev documentation server)
+    // Set up environment for OAuth authentication
+    const mcpEnv = {
+        ...process.env,
+        NODE_ENV: 'production',
+        // Add any OAuth tokens if available
+        CANVA_ACCESS_TOKEN: process.env.CANVA_ACCESS_TOKEN,
+        CANVA_CLIENT_ID: process.env.CANVA_CLIENT_ID,
+        CANVA_CLIENT_SECRET: process.env.CANVA_CLIENT_SECRET,
+        // Disable interactive authentication
+        CI: 'true',
+        NO_BROWSER: 'true',
+        HEADLESS: 'true'
+    };
+    
+    console.log('Environment variables set:', Object.keys(mcpEnv).filter(k => k.startsWith('CANVA') || ['CI', 'NO_BROWSER', 'HEADLESS'].includes(k)));
+    
     const mcpProcess = spawn('npx', ['-y', 'mcp-remote@latest', 'https://mcp.canva.com/mcp'], {
-        env: { ...process.env, NODE_ENV: 'production' }
+        env: mcpEnv
     });
 
     let responseData = '';
@@ -108,12 +124,23 @@ app.post('/api/mcp', (req, res) => {
         console.log('MCP process timeout, killing process');
         mcpProcess.kill();
         if (!res.headersSent) {
-            res.status(408).json({ 
-                error: 'MCP process timeout',
-                details: 'Process took too long to respond',
-                partialResponse: responseData,
-                partialError: errorData
-            });
+            // Check if this is an OAuth authentication issue
+            if (errorData.includes('Please authorize') || errorData.includes('Authentication required')) {
+                res.status(401).json({ 
+                    error: 'OAuth Authentication Required',
+                    details: 'The Canva MCP server requires OAuth authentication. Please set up authentication tokens in Railway environment variables.',
+                    authUrl: 'https://mcp.canva.com/authorize',
+                    instructions: 'This server needs to be authenticated with Canva. In a production environment, you would need to implement OAuth flow or provide pre-authenticated tokens.',
+                    partialError: errorData
+                });
+            } else {
+                res.status(408).json({ 
+                    error: 'MCP process timeout',
+                    details: 'Process took too long to respond',
+                    partialResponse: responseData,
+                    partialError: errorData
+                });
+            }
         }
     }, 30000); // 30 second timeout
 
@@ -126,6 +153,19 @@ app.post('/api/mcp', (req, res) => {
         
         if (!res.headersSent) {
             if (code !== 0) {
+                // Check if this is an OAuth authentication issue
+                if (errorData.includes('Please authorize') || errorData.includes('Authentication required') || errorData.includes('Browser opened')) {
+                    return res.status(401).json({ 
+                        error: 'OAuth Authentication Required',
+                        exitCode: code,
+                        details: 'The Canva MCP server requires OAuth authentication. This cannot be completed automatically in a serverless environment.',
+                        authUrl: 'https://mcp.canva.com/authorize',
+                        instructions: 'To use this server, you need to:\n1. Authenticate locally with the Canva MCP server\n2. Extract OAuth tokens\n3. Add them as Railway environment variables',
+                        partialError: errorData,
+                        partialResponse: responseData
+                    });
+                }
+                
                 return res.status(500).json({ 
                     error: 'MCP process failed.', 
                     exitCode: code,
