@@ -211,6 +211,61 @@
         const responseDiv = document.getElementById('response');
         const serverStatus = document.getElementById('serverStatus');
 
+        async function submitCallbackUrl() {
+            const callbackUrl = document.getElementById('callbackUrlInput').value.trim();
+            const responseDiv = document.getElementById('response');
+            
+            if (!callbackUrl) {
+                alert('Please paste the callback URL first');
+                return;
+            }
+            
+            responseDiv.textContent = 'Submitting callback URL...';
+            responseDiv.className = 'response-box';
+            
+            try {
+                const response = await fetch(`${API_URL}/api/oauth/callback`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ callbackUrl })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    responseDiv.innerHTML = `
+                        <div style="padding: 20px; background: #d4edda; border: 2px solid #c3e6cb; border-radius: 8px; margin: 10px 0;">
+                            <h3 style="color: #155724; margin-top: 0;">✅ ${data.message}</h3>
+                            <p><strong>Authorization Code:</strong> ${data.code}</p>
+                            <p><strong>State:</strong> ${data.state}</p>
+                            <p style="margin-top: 15px; font-weight: bold;">${data.instructions}</p>
+                            <button onclick="document.getElementById('promptInput').focus()" style="
+                                background: #28a745;
+                                color: white;
+                                padding: 10px 20px;
+                                border: none;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                margin-top: 10px;
+                            ">🚀 Try Your Request Now</button>
+                        </div>
+                    `;
+                    responseDiv.className = 'response-box';
+                    
+                    // Clear the input
+                    document.getElementById('callbackUrlInput').value = '';
+                } else {
+                    responseDiv.textContent = `Error: ${data.error}\n\nDetails: ${data.message || data.details || 'No additional details'}`;
+                    responseDiv.className = 'response-box error';
+                }
+            } catch (error) {
+                responseDiv.textContent = `Network Error: ${error.message}`;
+                responseDiv.className = 'response-box error';
+            }
+        }
+
         // Check server status on load
         async function checkServerStatus() {
             try {
@@ -286,17 +341,35 @@
                                     <strong>Redirect URI:</strong> ${data.redirectUri || 'N/A'}
                                 </p>
                                 <p style="font-size: 12px; color: #888; margin-top: 15px;">
-                                    After authorizing, <strong>try your request again</strong> - the server should now be authenticated.
+                                    After authorizing, if the redirect fails (goes to localhost), <strong>copy the callback URL</strong> and paste it below:
                                 </p>
-                                <button onclick="document.getElementById('promptInput').focus()" style="
-                                    background: #28a745;
-                                    color: white;
-                                    padding: 8px 16px;
-                                    border: none;
-                                    border-radius: 4px;
-                                    cursor: pointer;
-                                    margin-top: 10px;
-                                ">↩️ Try Request Again</button>
+                                <div style="margin-top: 15px;">
+                                    <input type="text" id="callbackUrlInput" placeholder="Paste the callback URL here (http://localhost:29865/oauth/callback?code=...)" style="
+                                        width: 100%;
+                                        padding: 8px;
+                                        border: 1px solid #ddd;
+                                        border-radius: 4px;
+                                        font-size: 12px;
+                                        margin-bottom: 8px;
+                                    ">
+                                    <button onclick="submitCallbackUrl()" style="
+                                        background: #ff9800;
+                                        color: white;
+                                        padding: 8px 16px;
+                                        border: none;
+                                        border-radius: 4px;
+                                        cursor: pointer;
+                                        margin-right: 8px;
+                                    ">📝 Submit Callback URL</button>
+                                    <button onclick="document.getElementById('promptInput').focus()" style="
+                                        background: #28a745;
+                                        color: white;
+                                        padding: 8px 16px;
+                                        border: none;
+                                        border-radius: 4px;
+                                        cursor: pointer;
+                                    ">↩️ Try Request Again</button>
+                                </div>
                             </div>
                         `;
                         responseDiv.className = 'response-box';

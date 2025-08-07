@@ -96,6 +96,64 @@ app.get('/test-oauth-url', async (req, res) => {
     }
 });
 
+// Manual callback URL submission endpoint
+app.post('/api/oauth/callback', (req, res) => {
+    const { callbackUrl } = req.body;
+    
+    if (!callbackUrl) {
+        return res.status(400).json({ 
+            error: 'Callback URL is required',
+            message: 'Please provide the callback URL from Canva authorization'
+        });
+    }
+    
+    try {
+        // Parse the callback URL to extract query parameters
+        const url = new URL(callbackUrl);
+        const code = url.searchParams.get('code');
+        const state = url.searchParams.get('state');
+        const error = url.searchParams.get('error');
+        const error_description = url.searchParams.get('error_description');
+        
+        console.log(`Manual callback received - Code: ${!!code}, State: ${state}, Error: ${error}`);
+        
+        if (error) {
+            return res.status(400).json({
+                error: 'Authorization failed',
+                details: error,
+                description: error_description
+            });
+        }
+        
+        if (!code) {
+            return res.status(400).json({
+                error: 'No authorization code found',
+                message: 'The callback URL did not contain an authorization code'
+            });
+        }
+        
+        // Store the authorization code for the MCP process to use
+        global.oauthCode = code;
+        global.oauthState = state;
+        
+        res.json({
+            success: true,
+            message: 'Authorization code received successfully',
+            code: code,
+            state: state,
+            instructions: 'You can now retry your original request - the server is authenticated!'
+        });
+        
+    } catch (error) {
+        console.error('Error parsing callback URL:', error);
+        res.status(400).json({
+            error: 'Invalid callback URL',
+            message: 'Could not parse the provided callback URL',
+            details: error.message
+        });
+    }
+});
+
 // OAuth callback endpoint to handle Canva authorization
 app.get('/oauth/callback', (req, res) => {
     const { code, state, error, error_description } = req.query;
