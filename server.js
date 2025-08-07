@@ -95,7 +95,7 @@ async function handleOAuthWithBrowser(authUrl) {
         console.log(`Navigating to OAuth URL: ${authUrl}`);
         
         // Navigate to the OAuth authorization URL
-        await page.goto(authUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+        await page.goto(authUrl, { waitUntil: 'networkidle', timeout: 30000 });
         
         // Wait for the page to load and look for authorization elements
         await page.waitForTimeout(2000);
