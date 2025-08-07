@@ -247,8 +247,31 @@ app.post('/api/mcp', (req, res) => {
             // Replace localhost redirect URI with our Railway server URL
             const baseUrl = req.get('host') ? `https://${req.get('host')}` : 'http://localhost:3000';
             const railwayCallbackUrl = encodeURIComponent(`${baseUrl}/oauth/callback`);
-            authUrl = authUrl.replace(/redirect_uri=[^&]+/, `redirect_uri=${railwayCallbackUrl}`);
-            console.log(`Modified OAuth URL: ${authUrl}`);
+            
+            console.log(`Base URL: ${baseUrl}`);
+            console.log(`Railway callback URL: ${railwayCallbackUrl}`);
+            console.log(`Original OAuth URL: ${authUrl}`);
+            
+            // More robust URL replacement - try multiple patterns
+            const originalUrl = authUrl;
+            authUrl = authUrl.replace(/redirect_uri=([^&]+)/, `redirect_uri=${railwayCallbackUrl}`);
+            
+            // If that didn't work, try URL decoding first
+            if (authUrl === originalUrl) {
+                const decodedUrl = decodeURIComponent(authUrl);
+                console.log(`Trying with decoded URL: ${decodedUrl}`);
+                authUrl = decodedUrl.replace(/redirect_uri=([^&]+)/, `redirect_uri=${railwayCallbackUrl}`);
+                authUrl = encodeURI(authUrl);
+            }
+            
+            // If still not working, do a more aggressive replacement
+            if (authUrl === originalUrl || authUrl.includes('localhost')) {
+                console.log('Doing aggressive localhost replacement...');
+                authUrl = authUrl.replace(/http%3A%2F%2Flocalhost%3A\d+%2Foauth%2Fcallback/, railwayCallbackUrl);
+                authUrl = authUrl.replace(/http:\/\/localhost:\d+\/oauth\/callback/, `${baseUrl}/oauth/callback`);
+            }
+            
+            console.log(`Final modified OAuth URL: ${authUrl}`);
             
             // Immediately return the OAuth URL to the frontend
             clearTimeout(timeout);
