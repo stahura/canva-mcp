@@ -98,8 +98,8 @@ app.get('/test-oauth-url', async (req, res) => {
     }
 });
 
-// Manual callback URL submission endpoint
-app.post('/api/oauth/callback', (req, res) => {
+// Manual callback URL submission endpoint (now forwards to local mcp-remote callback)
+app.post('/api/oauth/callback', async (req, res) => {
     const { callbackUrl } = req.body;
     
     if (!callbackUrl) {
@@ -110,142 +110,41 @@ app.post('/api/oauth/callback', (req, res) => {
     }
     
     try {
-        // Parse the callback URL to extract query parameters
-        const url = new URL(callbackUrl);
-        const code = url.searchParams.get('code');
-        const state = url.searchParams.get('state');
-        const error = url.searchParams.get('error');
-        const error_description = url.searchParams.get('error_description');
-        
-        console.log(`Manual callback received - Code: ${!!code}, State: ${state}, Error: ${error}`);
-        
-        if (error) {
-            return res.status(400).json({
-                error: 'Authorization failed',
-                details: error,
-                description: error_description
+        const parsed = new URL(callbackUrl);
+        const search = parsed.search || '';
+        const forwardUrl = `http://127.0.0.1:${MCP_LOCAL_PORT}/callback${search}`;
+        console.log(`[OAuth Manual] Forwarding pasted callback to mcp-remote: ${forwardUrl}`);
+        const fetch = (await import('node-fetch')).default;
+        const response = await fetch(forwardUrl, { method: 'GET' });
+        const text = await response.text();
+        if (!response.ok) {
+            console.error('[OAuth Manual] mcp-remote callback failed:', response.status, text);
+            return res.status(502).json({
+                error: 'Failed to deliver callback to auth coordinator',
+                status: response.status,
+                body: text
             });
         }
-        
-        if (!code) {
-            return res.status(400).json({
-                error: 'No authorization code found',
-                message: 'The callback URL did not contain an authorization code'
-            });
-        }
-        
-        // Store the authorization code for the MCP process to use
-        global.oauthCode = code;
-        global.oauthState = state;
-        
-        res.json({
+
+        const code = parsed.searchParams.get('code');
+        const state = parsed.searchParams.get('state');
+        return res.json({
             success: true,
-            message: 'Authorization code received successfully',
-            code: code,
-            state: state,
-            instructions: 'You can now retry your original request - the server is authenticated!'
+            message: 'Authorization code delivered. You can retry your request now.',
+            code,
+            state
         });
-        
     } catch (error) {
-        console.error('Error parsing callback URL:', error);
+        console.error('Error handling manual callback URL:', error);
         res.status(400).json({
             error: 'Invalid callback URL',
-            message: 'Could not parse the provided callback URL',
+            message: 'Could not parse or forward the provided callback URL',
             details: error.message
         });
     }
 });
 
-// OAuth callback endpoint to handle Canva authorization
-app.get('/oauth/callback', (req, res) => {
-    const { code, state, error, error_description } = req.query;
-    
-    console.log(`OAuth callback received:`, { code: !!code, state, error, error_description, fullQuery: req.query });
-    
-    if (error) {
-        return res.send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Authorization Error</title>
-                <style>
-                    body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; text-align: center; }
-                    .error { background: #f8d7da; border: 2px solid #f5c6cb; padding: 20px; border-radius: 8px; }
-                    .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; margin: 10px 0; }
-                    .button { background: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
-                </style>
-            </head>
-            <body>
-                <div class="error">
-                    <h2>❌ Authorization Failed</h2>
-                    <p><strong>Error:</strong> ${error}</p>
-                    ${error_description ? `<p><strong>Description:</strong> ${error_description}</p>` : ''}
-                    <p>Please try the authorization process again or contact support.</p>
-                    <button class="button" onclick="window.close()">Close Tab</button>
-                </div>
-            </body>
-            </html>
-        `);
-    }
-    
-    if (!code) {
-        return res.send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Authorization Issue</title>
-                <style>
-                    body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; text-align: center; }
-                    .warning { background: #fff3cd; border: 2px solid #ffeaa7; padding: 20px; border-radius: 8px; }
-                    .debug { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; margin: 10px 0; text-align: left; }
-                </style>
-            </head>
-            <body>
-                <div class="warning">
-                    <h2>⚠️ No Authorization Code Received</h2>
-                    <p>The OAuth callback did not include an authorization code.</p>
-                    <div class="debug">Query Parameters: ${JSON.stringify(req.query, null, 2)}</div>
-                    <p>This might indicate an issue with the Canva authorization server or the OAuth flow.</p>
-                    <button onclick="window.close()">Close Tab</button>
-                </div>
-            </body>
-            </html>
-        `);
-    }
-
-    console.log(`Received OAuth callback - Code: ${code}, State: ${state}`);
-    
-    // Store the authorization code temporarily (in a real app, you'd use Redis or similar)
-    global.oauthCode = code;
-    global.oauthState = state;
-    
-    // Return a success page
-    res.send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Authorization Successful</title>
-            <style>
-                body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; text-align: center; }
-                .success { background: #d4edda; border: 2px solid #c3e6cb; padding: 20px; border-radius: 8px; }
-                .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; margin: 10px 0; }
-                .button { background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
-            </style>
-        </head>
-        <body>
-            <div class="success">
-                <h2>🎉 Authorization Successful!</h2>
-                <p>You have successfully authorized the Canva MCP server.</p>
-                <div class="code">Authorization Code: ${code}</div>
-                <p>You can now close this tab and return to your application to make requests.</p>
-                <button class="button" onclick="window.close()">Close Tab</button>
-            </div>
-        </body>
-        </html>
-    `);
-});
-
-// NEW: Public callback that proxies to mcp-remote's local callback listener
+// OAuth callback endpoint to handle Canva authorization (proxy variant)
 app.get('/oauth/mcp/callback', async (req, res) => {
     try {
         const originalQuery = req.url.split('?')[1] || '';
@@ -296,24 +195,17 @@ app.post('/api/mcp', (req, res) => {
     ensureCanvaCredentials();
 
     console.log("Starting Canva MCP process...");
-    // Use the actual Canva MCP server (not the dev documentation server)
-    // Determine the base URL for OAuth redirect
     const baseUrl = req.get('host') ? `https://${req.get('host')}` : 'http://localhost:3000';
     
-    // Set up environment for OAuth authentication
     const mcpEnv = {
         ...process.env,
         NODE_ENV: 'production',
-        // Add any OAuth tokens if available
         CANVA_ACCESS_TOKEN: process.env.CANVA_ACCESS_TOKEN,
         CANVA_CLIENT_ID: process.env.CANVA_CLIENT_ID,
         CANVA_CLIENT_SECRET: process.env.CANVA_CLIENT_SECRET,
-        // Keep existing credentials approach as fallback
         CANVA_CREDENTIALS_BASE64: process.env.CANVA_CREDENTIALS_BASE64,
         CANVA_CREDENTIALS: process.env.CANVA_CREDENTIALS,
-        // Set the OAuth redirect URI to our Railway server
         OAUTH_REDIRECT_URI: `${baseUrl}/oauth/mcp/callback`,
-        // Disable interactive authentication
         CI: 'true',
         NO_BROWSER: 'true',
         HEADLESS: 'true'
@@ -321,7 +213,6 @@ app.post('/api/mcp', (req, res) => {
     
     console.log('Environment variables set:', Object.keys(mcpEnv).filter(k => k.startsWith('CANVA') || ['CI', 'NO_BROWSER', 'HEADLESS'].includes(k)));
     
-    // IMPORTANT: fix the local port so we can proxy the callback back to mcp-remote
     const mcpArgs = ['-y', 'mcp-remote@latest', 'https://mcp.canva.com/mcp', String(MCP_LOCAL_PORT)];
     console.log(`Spawning mcp-remote with args: ${JSON.stringify(mcpArgs)}`);
     const mcpProcess = spawn('npx', mcpArgs, {
@@ -333,57 +224,25 @@ app.post('/api/mcp', (req, res) => {
     let authInProgress = false;
     let timeout;
 
-    // Listen for data coming out of the MCP process
     mcpProcess.stdout.on('data', (data) => {
         responseData += data.toString();
         console.log(`MCP stdout: ${data}`);
     });
 
-    // Listen for any errors and extract OAuth URLs
     mcpProcess.stderr.on('data', (data) => {
         const dataStr = data.toString();
         errorData += dataStr;
         console.error(`MCP stderr: ${dataStr}`);
         
-        // Check for OAuth authorization URL
         const authUrlMatch = dataStr.match(/Please authorize this client by visiting:\s*(https?:\/\/[^\s]+)/);
         if (authUrlMatch) {
-            let authUrl = authUrlMatch[1];
-            console.log(`Found OAuth URL: ${authUrl}`);
+            const originalUrl = authUrlMatch[1];
+            const authUrl = originalUrl; // Do NOT rewrite redirect_uri; use manual/paste flow
+            console.log(`Found OAuth URL (no rewrite): ${authUrl}`);
             
-            // Replace localhost redirect URI with our server URL that proxies to mcp-remote local callback
-            const publicCallbackUrl = `${baseUrl}/oauth/mcp/callback`;
-            const railwayCallbackUrl = encodeURIComponent(publicCallbackUrl);
-            
-            console.log(`Base URL: ${baseUrl}`);
-            console.log(`Public callback URL: ${publicCallbackUrl}`);
-            console.log(`Original OAuth URL: ${authUrl}`);
-            
-            const originalUrl = authUrl;
-            authUrl = authUrl.replace(/redirect_uri=([^&]+)/, `redirect_uri=${railwayCallbackUrl}`);
-            
-            // If that didn't work, try URL decoding first
-            if (authUrl === originalUrl) {
-                const decodedUrl = decodeURIComponent(authUrl);
-                console.log(`Trying with decoded URL: ${decodedUrl}`);
-                authUrl = decodedUrl.replace(/redirect_uri=([^&]+)/, `redirect_uri=${railwayCallbackUrl}`);
-                authUrl = encodeURI(authUrl);
-            }
-            
-            // As a last resort, aggressive replacement of common localhost encodings
-            if (authUrl === originalUrl || authUrl.includes('localhost')) {
-                console.log('Doing aggressive localhost replacement...');
-                authUrl = authUrl.replace(/http%3A%2F%2Flocalhost%3A\d+%2Fcallback/, railwayCallbackUrl);
-                authUrl = authUrl.replace(/http:\/\/localhost:\d+\/callback/, publicCallbackUrl);
-            }
-            
-            console.log(`Final modified OAuth URL: ${authUrl}`);
-            
-            // Extend timeout while we wait for human consent
             if (!authInProgress) {
                 authInProgress = true;
                 if (timeout) clearTimeout(timeout);
-                // Give up to 5 minutes for the user to click Allow and be redirected
                 timeout = setTimeout(() => {
                     console.log('MCP process auth timeout, killing process');
                     mcpProcess.kill();
@@ -398,27 +257,25 @@ app.post('/api/mcp', (req, res) => {
             }
             
             if (!res.headersSent) {
-                // Return immediate response with the human-facing auth URL
                 res.status(200).json({
                     authorize: true,
-                    message: 'Authorization required. Visit the URL to grant access, then retry your request.',
+                    message: 'Authorization required. Open the URL, approve, then if redirected to localhost copy the full URL and paste it below.',
                     authUrl,
-                    callback: publicCallbackUrl
+                    callback: `${baseUrl}/oauth/mcp/callback`,
+                    manualPaste: true
                 });
             }
         }
     });
 
-    // Set a timeout for the MCP process (will be overridden if auth is in progress)
     timeout = setTimeout(() => {
         console.log('MCP process timeout, killing process');
         mcpProcess.kill();
         if (!res.headersSent) {
-            // Check if this is an OAuth authentication issue
             if (errorData.includes('Please authorize') || errorData.includes('Authentication required')) {
                 res.status(401).json({ 
                     error: 'OAuth Authentication Required',
-                    details: 'The Canva MCP server requires OAuth authentication. Visit the provided auth URL from a previous response, then retry.',
+                    details: 'Authorization required. Use the provided auth URL, and if redirected to localhost, paste that URL into the client.',
                     partialError: errorData
                 });
             } else {
@@ -430,9 +287,8 @@ app.post('/api/mcp', (req, res) => {
                 });
             }
         }
-    }, 30000); // 30 second default timeout
+    }, 30000);
 
-    // When the process closes, send the response back to your client
     mcpProcess.on('close', (code) => {
         if (timeout) clearTimeout(timeout);
         console.log(`MCP process exited with code ${code}`);
@@ -441,12 +297,11 @@ app.post('/api/mcp', (req, res) => {
         
         if (!res.headersSent) {
             if (code !== 0) {
-                // Check if this is an OAuth authentication issue
                 if (errorData.includes('Please authorize') || errorData.includes('Authentication required') || errorData.includes('Browser opened')) {
                     return res.status(401).json({ 
                         error: 'OAuth Authentication Required',
                         exitCode: code,
-                        details: 'Authorization is required and must be completed via the provided URL. After authorizing, retry your request.',
+                        details: 'Authorization is required. After approving in the browser, paste the localhost callback URL in the client.',
                         partialError: errorData,
                         partialResponse: responseData
                     });
@@ -460,7 +315,6 @@ app.post('/api/mcp', (req, res) => {
                 });
             }
             
-            // Return success even if no response data (MCP might not produce output for some commands)
             res.json({ 
                 success: true,
                 response: responseData || 'MCP process completed successfully',
@@ -471,7 +325,6 @@ app.post('/api/mcp', (req, res) => {
         }
     });
 
-    // Handle process errors
     mcpProcess.on('error', (error) => {
         if (timeout) clearTimeout(timeout);
         console.error('MCP process error:', error);
@@ -483,7 +336,6 @@ app.post('/api/mcp', (req, res) => {
         }
     });
 
-    // MCP protocol: First initialize the connection
     const initRequest = {
         jsonrpc: "2.0",
         id: 1,
@@ -503,7 +355,6 @@ app.post('/api/mcp', (req, res) => {
     console.log(`Initializing MCP connection:`, JSON.stringify(initRequest));
     mcpProcess.stdin.write(JSON.stringify(initRequest) + '\n');
 
-    // Wait a moment then send the actual request
     setTimeout(() => {
         const toolRequest = {
             jsonrpc: "2.0",
@@ -514,11 +365,8 @@ app.post('/api/mcp', (req, res) => {
         console.log(`Listing available tools:`, JSON.stringify(toolRequest));
         mcpProcess.stdin.write(JSON.stringify(toolRequest) + '\n');
         
-        // Use the appropriate tool from the actual Canva MCP server
         setTimeout(() => {
             let toolRequest;
-            
-            // If asking about design/creation, try to generate a design
             if (prompt.toLowerCase().includes('design') || prompt.toLowerCase().includes('create')) {
                 toolRequest = {
                     jsonrpc: "2.0",
@@ -531,9 +379,7 @@ app.post('/api/mcp', (req, res) => {
                         }
                     }
                 };
-            } 
-            // If asking about search, use search-designs
-            else if (prompt.toLowerCase().includes('search') || prompt.toLowerCase().includes('find')) {
+            } else if (prompt.toLowerCase().includes('search') || prompt.toLowerCase().includes('find')) {
                 toolRequest = {
                     jsonrpc: "2.0",
                     id: 3,
@@ -545,9 +391,7 @@ app.post('/api/mcp', (req, res) => {
                         }
                     }
                 };
-            }
-            // Default to generate-design for general requests
-            else {
+            } else {
                 toolRequest = {
                     jsonrpc: "2.0",
                     id: 3,
