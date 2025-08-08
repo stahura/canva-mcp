@@ -112,17 +112,27 @@ app.post('/api/oauth/callback', async (req, res) => {
     try {
         const parsed = new URL(callbackUrl);
         const search = parsed.search || '';
-        const forwardUrl = `http://127.0.0.1:${MCP_LOCAL_PORT}/callback${search}`;
-        console.log(`[OAuth Manual] Forwarding pasted callback to mcp-remote: ${forwardUrl}`);
         const fetch = (await import('node-fetch')).default;
-        const response = await fetch(forwardUrl, { method: 'GET' });
-        const text = await response.text();
-        if (!response.ok) {
-            console.error('[OAuth Manual] mcp-remote callback failed:', response.status, text);
+
+        // Try multiple local callback paths to match mcp-remote
+        const candidatePaths = ['/callback', '/oauth/callback'];
+        let delivered = false;
+        let lastStatus = 0;
+        let lastBody = '';
+        for (const path of candidatePaths) {
+            const forwardUrl = `http://127.0.0.1:${MCP_LOCAL_PORT}${path}${search}`;
+            console.log(`[OAuth Manual] Forwarding pasted callback to mcp-remote: ${forwardUrl}`);
+            const response = await fetch(forwardUrl, { method: 'GET' });
+            lastStatus = response.status;
+            lastBody = await response.text();
+            if (response.ok) { delivered = true; break; }
+            console.warn(`[OAuth Manual] mcp-remote callback at ${path} responded ${lastStatus}`);
+        }
+        if (!delivered) {
             return res.status(502).json({
                 error: 'Failed to deliver callback to auth coordinator',
-                status: response.status,
-                body: text
+                status: lastStatus,
+                body: lastBody
             });
         }
 
@@ -183,6 +193,24 @@ app.get('/oauth/mcp/callback', async (req, res) => {
     }
 });
 
+// Also support plain '/callback' for providers that redirect here
+app.get('/callback', async (req, res) => {
+    try {
+        const originalQuery = req.url.split('?')[1] || '';
+        const forwardUrl = `http://127.0.0.1:${MCP_LOCAL_PORT}/callback${originalQuery ? `?${originalQuery}` : ''}`;
+        console.log(`[OAuth Proxy] Forwarding /callback to mcp-remote: ${forwardUrl}`);
+        const fetch = (await import('node-fetch')).default;
+        const response = await fetch(forwardUrl, { method: 'GET' });
+        const text = await response.text();
+        const ok = response.ok;
+        console.log(`[OAuth Proxy] mcp-remote /callback response (${response.status}): ${text.substring(0, 200)}...`);
+        return res.status(ok ? 200 : 502).send(ok ? 'OK' : 'Callback handling error');
+    } catch (err) {
+        console.error('[OAuth Proxy] Error forwarding /callback:', err);
+        return res.status(500).send('Internal error handling OAuth callback');
+    }
+});
+
 // This is the API endpoint your client will hit
 app.post('/api/mcp', (req, res) => {
     const { prompt } = req.body;
@@ -196,6 +224,7 @@ app.post('/api/mcp', (req, res) => {
 
     console.log("Starting Canva MCP process...");
     const baseUrl = req.get('host') ? `https://${req.get('host')}` : 'http://localhost:3000';
+    const baseHost = req.get('host') || 'localhost:3000';
     
     const mcpEnv = {
         ...process.env,
@@ -205,7 +234,7 @@ app.post('/api/mcp', (req, res) => {
         CANVA_CLIENT_SECRET: process.env.CANVA_CLIENT_SECRET,
         CANVA_CREDENTIALS_BASE64: process.env.CANVA_CREDENTIALS_BASE64,
         CANVA_CREDENTIALS: process.env.CANVA_CREDENTIALS,
-        OAUTH_REDIRECT_URI: `${baseUrl}/oauth/mcp/callback`,
+        OAUTH_REDIRECT_URI: `${baseUrl}/callback`,
         CI: 'true',
         NO_BROWSER: 'true',
         HEADLESS: 'true'
@@ -213,7 +242,8 @@ app.post('/api/mcp', (req, res) => {
     
     console.log('Environment variables set:', Object.keys(mcpEnv).filter(k => k.startsWith('CANVA') || ['CI', 'NO_BROWSER', 'HEADLESS'].includes(k)));
     
-    const mcpArgs = ['-y', 'mcp-remote@latest', 'https://mcp.canva.com/mcp', String(MCP_LOCAL_PORT)];
+    // Register public host and HTTPS port 443 so provider redirects to our server
+    const mcpArgs = ['-y', 'mcp-remote@latest', 'https://mcp.canva.com/mcp', '443', '--host', baseHost];
     console.log(`Spawning mcp-remote with args: ${JSON.stringify(mcpArgs)}`);
     const mcpProcess = spawn('npx', mcpArgs, {
         env: mcpEnv
