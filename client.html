@@ -344,37 +344,37 @@
                                     <strong>Redirect URI:</strong> ${data.callback || 'N/A'}
                                 </p>
                                 <p style="font-size: 12px; color: #888; margin-top: 15px;">
-                                    After authorizing, you should be redirected back automatically. If not, copy the final URL from your browser and paste it below.
-                                </p>
-                                <div style="margin-top: 15px;">
-                                    <input type="text" id="callbackUrlInput" placeholder="Paste the OAuth callback URL here (https://YOUR-APP/oauth/mcp/callback?code=...)" style="
-                                        width: 100%;
-                                        padding: 8px;
-                                        border: 1px solid #ddd;
-                                        border-radius: 4px;
-                                        font-size: 12px;
-                                        margin-bottom: 8px;
-                                    ">
-                                    <button onclick="submitCallbackUrl()" style="
-                                        background: #ff9800;
-                                        color: white;
-                                        padding: 8px 16px;
-                                        border: none;
-                                        border-radius: 4px;
-                                        cursor: pointer;
-                                        margin-right: 8px;
-                                    ">📝 Submit Callback URL</button>
-                                    <button onclick="document.getElementById('prompt').focus()" style="
-                                        background: #28a745;
-                                        color: white;
-                                        padding: 8px 16px;
-                                        border: none;
-                                        border-radius: 4px;
-                                        cursor: pointer;
-                                    ">↩️ Try Request Again</button>
-                                </div>
-                            </div>
-                        `;
+                                    After authorizing, if you see an error or a localhost page, <strong>copy the full URL from the address bar</strong> (it may be <code>https://mcp.canva.com/callback?code=...</code> or <code>http://localhost:3334/callback?code=...</code>) and paste it below.
+                                 </p>
+                                 <div style="margin-top: 15px;">
+                                    <input type="text" id="callbackUrlInput" placeholder="Paste the OAuth callback URL here (mcp.canva.com/callback?... or http://localhost:3334/callback?...)" style="
+                                         width: 100%;
+                                         padding: 8px;
+                                         border: 1px solid #ddd;
+                                         border-radius: 4px;
+                                         font-size: 12px;
+                                         margin-bottom: 8px;
+                                     ">
+                                     <button onclick="submitCallbackUrl()" style="
+                                         background: #ff9800;
+                                         color: white;
+                                         padding: 8px 16px;
+                                         border: none;
+                                         border-radius: 4px;
+                                         cursor: pointer;
+                                         margin-right: 8px;
+                                     ">📝 Submit Callback URL</button>
+                                     <button onclick="document.getElementById('prompt').focus()" style="
+                                         background: #28a745;
+                                         color: white;
+                                         padding: 8px 16px;
+                                         border: none;
+                                         border-radius: 4px;
+                                         cursor: pointer;
+                                     ">↩️ Try Request Again</button>
+                                 </div>
+                             </div>
+                         `;
                         responseDiv.className = 'response-box';
                     }
                     // Legacy path (no longer used by server, kept as fallback)
