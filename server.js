@@ -242,8 +242,8 @@ app.post('/api/mcp', (req, res) => {
     
     console.log('Environment variables set:', Object.keys(mcpEnv).filter(k => k.startsWith('CANVA') || ['CI', 'NO_BROWSER', 'HEADLESS'].includes(k)));
     
-    // Register public host and HTTPS port 443 so provider redirects to our server
-    const mcpArgs = ['-y', 'mcp-remote@latest', 'https://mcp.canva.com/mcp', '443', '--host', baseHost];
+    // Revert to local callback listener to use allowed redirect hosts (e.g., localhost)
+    const mcpArgs = ['-y', 'mcp-remote@latest', 'https://mcp.canva.com/mcp', String(MCP_LOCAL_PORT)];
     console.log(`Spawning mcp-remote with args: ${JSON.stringify(mcpArgs)}`);
     const mcpProcess = spawn('npx', mcpArgs, {
         env: mcpEnv
