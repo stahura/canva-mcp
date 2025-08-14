@@ -3,207 +3,513 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Canva MCP Client</title>
+    <title>Canva AI Design Studio</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-
+        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 50px 40px;
+            text-align: center;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.05"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            opacity: 0.3;
+        }
+        
+        .header h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            letter-spacing: -0.02em;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .header .subtitle {
+            font-size: 1.3rem;
+            opacity: 0.9;
+            font-weight: 400;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .main-content {
+            padding: 50px 40px;
+        }
+        
+        .server-status {
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
-        }
-
-        .container {
-            background: white;
+            margin-bottom: 40px;
+            padding: 20px 32px;
             border-radius: 16px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            padding: 40px;
-            width: 100%;
-            max-width: 600px;
-        }
-
-        h1 {
-            color: #333;
-            margin-bottom: 8px;
-            font-size: 2.5rem;
-            font-weight: 700;
-        }
-
-        .subtitle {
-            color: #666;
-            margin-bottom: 32px;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border: 1px solid #e2e8f0;
+            font-weight: 600;
             font-size: 1.1rem;
         }
-
-        .form-group {
-            margin-bottom: 24px;
+        
+        .status-indicator {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            margin-right: 16px;
+            position: relative;
         }
-
+        
+        .status-online {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+        }
+        
+        .status-online::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 6px;
+            height: 6px;
+            background: white;
+            border-radius: 50%;
+        }
+        
+        .status-offline {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.2);
+        }
+        
+        .input-section {
+            margin-bottom: 50px;
+        }
+        
+        .form-group {
+            margin-bottom: 32px;
+        }
+        
         label {
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 16px;
             font-weight: 600;
-            color: #333;
+            font-size: 1.2rem;
+            color: #374151;
         }
-
+        
         textarea {
             width: 100%;
-            min-height: 120px;
-            padding: 16px;
-            border: 2px solid #e1e5e9;
-            border-radius: 12px;
-            font-size: 16px;
+            min-height: 140px;
+            padding: 24px;
+            border: 2px solid #e5e7eb;
+            border-radius: 20px;
+            font-size: 18px;
             font-family: inherit;
             resize: vertical;
-            transition: border-color 0.2s ease;
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #fafbfc 0%, #f9fafb 100%);
+            line-height: 1.6;
         }
-
+        
         textarea:focus {
             outline: none;
             border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            background: white;
+            box-shadow: 0 0 0 6px rgba(102, 126, 234, 0.1);
+            transform: translateY(-2px);
         }
-
-        button {
+        
+        .submit-btn {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            padding: 24px 48px;
             border: none;
-            padding: 16px 32px;
-            border-radius: 12px;
-            font-size: 16px;
+            border-radius: 20px;
+            font-size: 18px;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
             width: 100%;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
+            position: relative;
+            overflow: hidden;
         }
-
-        button:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        
+        .submit-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
         }
-
-        button:disabled {
-            opacity: 0.6;
+        
+        .submit-btn:hover:not(:disabled)::before {
+            left: 100%;
+        }
+        
+        .submit-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 40px rgba(102, 126, 234, 0.4);
+        }
+        
+        .submit-btn:disabled {
+            background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
             cursor: not-allowed;
+            transform: none;
+            box-shadow: 0 4px 16px rgba(156, 163, 175, 0.2);
         }
-
+        
         .response-section {
-            margin-top: 32px;
-            padding-top: 32px;
-            border-top: 1px solid #e1e5e9;
+            margin-top: 50px;
         }
-
+        
         .response-box {
-            background: #f8f9fa;
-            border: 1px solid #e1e5e9;
-            border-radius: 12px;
-            padding: 20px;
-            min-height: 100px;
-            white-space: pre-wrap;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 14px;
-            line-height: 1.5;
+            border-radius: 20px;
+            padding: 32px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border: 1px solid #e2e8f0;
+            max-height: 600px;
+            overflow-y: auto;
+            min-height: 120px;
         }
-
-        .loading {
+        
+        .response-box.success {
+            background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
+            border-color: #bbf7d0;
+            color: #166534;
+            font-family: inherit;
+        }
+        
+        .response-box.error {
+            background: linear-gradient(135deg, #fef2f2 0%, #fef7f7 100%);
+            border-color: #fecaca;
+            color: #991b1b;
+        }
+        
+        .designs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 32px;
+            margin-top: 32px;
+        }
+        
+        .design-card {
+            background: white;
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.1);
+            transition: all 0.4s ease;
+            border: 1px solid #f1f5f9;
+            position: relative;
+        }
+        
+        .design-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .design-card:hover::before {
+            opacity: 1;
+        }
+        
+        .design-card:hover {
+            transform: translateY(-12px) scale(1.02);
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15);
+        }
+        
+        .design-card img {
+            width: 100%;
+            height: 320px;
+            object-fit: cover;
+            transition: transform 0.4s ease;
+        }
+        
+        .design-card:hover img {
+            transform: scale(1.08);
+        }
+        
+        .design-card-content {
+            padding: 28px;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .design-card-title {
+            font-weight: 700;
+            font-size: 1.3rem;
+            color: #1f2937;
+            margin-bottom: 12px;
+        }
+        
+        .design-card-subtitle {
+            color: #6b7280;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+        
+        .designs-header {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 12px;
             display: flex;
             align-items: center;
-            gap: 8px;
-            color: #667eea;
+            gap: 16px;
         }
-
+        
+        .designs-subheader {
+            color: #6b7280;
+            margin-bottom: 32px;
+            font-size: 1.2rem;
+            font-weight: 500;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 60px;
+        }
+        
         .spinner {
-            width: 20px;
-            height: 20px;
-            border: 2px solid #e1e5e9;
-            border-top: 2px solid #667eea;
+            width: 64px;
+            height: 64px;
+            border: 6px solid #f1f5f9;
+            border-top: 6px solid #667eea;
             border-radius: 50%;
             animation: spin 1s linear infinite;
+            margin: 0 auto 24px;
         }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        
+        .loading-text {
+            font-size: 1.3rem;
+            color: #6b7280;
+            font-weight: 600;
         }
-
-        .error {
-            color: #dc3545;
-            background: #f8d7da;
-            border-color: #f5c6cb;
+        
+        .auth-card {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border: 2px solid #3b82f6;
+            border-radius: 24px;
+            padding: 40px;
+            text-align: center;
         }
-
-        .success {
-            color: #155724;
-            background: #d4edda;
-            border-color: #c3e6cb;
+        
+        .auth-card h3 {
+            color: #1e40af;
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            font-weight: 700;
         }
-
-        .status-indicator {
+        
+        .auth-btn {
             display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            margin-right: 8px;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 16px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin: 24px 0;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3);
         }
-
-        .status-online {
-            background: #28a745;
+        
+        .auth-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 40px rgba(59, 130, 246, 0.4);
         }
-
-        .status-offline {
-            background: #dc3545;
+        
+        .callback-input {
+            width: 100%;
+            padding: 20px;
+            border: 2px solid #e5e7eb;
+            border-radius: 16px;
+            font-size: 16px;
+            margin: 20px 0 16px 0;
+            font-family: 'SF Mono', Monaco, monospace;
+            background: rgba(255, 255, 255, 0.8);
         }
-
+        
+        .callback-buttons {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        
+        .callback-btn {
+            flex: 1;
+            min-width: 160px;
+            padding: 16px 24px;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+        
+        .callback-btn.primary {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            box-shadow: 0 4px 16px rgba(245, 158, 11, 0.3);
+        }
+        
+        .callback-btn.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(245, 158, 11, 0.4);
+        }
+        
+        .callback-btn.secondary {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+        }
+        
+        .callback-btn.secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+        }
+        
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-
-        .server-status {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 24px;
-            display: flex;
-            align-items: center;
+        
+        @media (max-width: 1024px) {
+            .designs-grid {
+                grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+                gap: 24px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .header {
+                padding: 40px 20px;
+            }
+            
+            .header h1 {
+                font-size: 2.5rem;
+            }
+            
+            .main-content {
+                padding: 40px 20px;
+            }
+            
+            .designs-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .callback-buttons {
+                flex-direction: column;
+            }
+            
+            .callback-btn {
+                min-width: auto;
+            }
+            
+            .design-card img {
+                height: 280px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .header .subtitle {
+                font-size: 1.1rem;
+            }
+            
+            textarea {
+                font-size: 16px;
+                padding: 20px;
+            }
+            
+            .submit-btn {
+                padding: 20px 32px;
+                font-size: 16px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Canva MCP Client</h1>
-        <p class="subtitle">Send requests to your Canva MCP server on Railway</p>
-        
-        <div class="server-status" id="serverStatus">
-            <span class="status-indicator status-offline"></span>
-            Checking server status...
+        <div class="header">
+            <h1>🎨 Canva AI Design Studio</h1>
+            <p class="subtitle">Create stunning designs with AI-powered tools</p>
         </div>
-
-        <form id="mcpForm">
-            <div class="form-group">
-                <label for="prompt">Your Prompt/Request:</label>
-                <textarea 
-                    id="prompt" 
-                    name="prompt" 
-                    placeholder="Enter your request for the Canva MCP server..."
-                    required
-                ></textarea>
+        
+        <div class="main-content">
+            <div class="server-status" id="serverStatus">
+                <span class="status-indicator status-offline"></span>
+                Checking server status...
             </div>
-            
-            <button type="submit" id="submitBtn">Send Request</button>
-        </form>
 
-        <div class="response-section">
-            <label>Response:</label>
-            <div id="response" class="response-box">
-                Ready to send your first request...
+            <form id="mcpForm" class="input-section">
+                <div class="form-group">
+                    <label for="prompt">What would you like to create?</label>
+                    <textarea 
+                        id="prompt" 
+                        name="prompt" 
+                        placeholder="Describe your design idea... (e.g., 'Create a modern business card for a tech startup' or 'Design an Instagram post about sustainable living')"
+                        required
+                    ></textarea>
+                </div>
+                
+                <button type="submit" id="submitBtn" class="submit-btn">✨ Generate Design</button>
+            </form>
+
+            <div class="response-section">
+                <div id="response" class="response-box">
+                    Ready to bring your ideas to life...
+                </div>
             </div>
         </div>
     </div>
@@ -245,26 +551,29 @@
             // Try to render generated designs nicely
             const designs = extractGeneratedDesigns(data);
             if (designs && designs.length) {
-                const cards = designs.map(d => {
+                const cards = designs.map((d, index) => {
                     const url = d.url || '#';
                     const thumb = d.thumbnail?.url || '';
                     return `
-                        <a href="${url}" target="_blank" rel="noopener" style="
-                            display: block; text-decoration: none; color: inherit;">
-                            <div style="
-                                background: #fff; border: 1px solid #e1e5e9; border-radius: 10px; overflow: hidden;
-                                box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
-                                ${thumb ? `<img src="${thumb}" alt="Design thumbnail" style="width:100%; height: 180px; object-fit: cover;">` : ''}
-                                <div style="padding: 10px 12px; font-weight: 600; font-size: 14px; color: #374151;">
-                                    Open design
+                        <a href="${url}" target="_blank" rel="noopener" style="text-decoration: none; color: inherit;">
+                            <div class="design-card">
+                                ${thumb ? `<img src="${thumb}" alt="Generated design ${index + 1}" loading="lazy">` : ''}
+                                <div class="design-card-content">
+                                    <div class="design-card-title">Design ${index + 1}</div>
+                                    <div class="design-card-subtitle">Click to open in Canva</div>
                                 </div>
                             </div>
                         </a>
                     `;
                 }).join('');
+                
                 responseDiv.innerHTML = `
-                    <div style="margin-bottom: 8px; font-weight: 600; color: #333;">Generated designs</div>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px;">
+                    <div class="designs-header">
+                        🎨 Generated Designs
+                        <span style="font-size: 1rem; font-weight: 500; color: #6b7280;">(${designs.length} results)</span>
+                    </div>
+                    <div class="designs-subheader">Click any design to open and edit in Canva</div>
+                    <div class="designs-grid">
                         ${cards}
                     </div>
                 `;
@@ -286,7 +595,12 @@
                 return;
             }
             
-            responseDiv.textContent = 'Submitting callback URL...';
+            responseDiv.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <div class="loading-text">Processing authorization...</div>
+                </div>
+            `;
             responseDiv.className = 'response-box';
             
             try {
@@ -302,20 +616,21 @@
                 
                 if (response.ok) {
                     responseDiv.innerHTML = `
-                        <div style="padding: 20px; background: #d4edda; border: 2px solid #c3e6cb; border-radius: 8px; margin: 10px 0;">
-                            <h3 style="color: #155724; margin-top: 0;">✅ ${data.message}</h3>
-                            <p><strong>Authorization Code:</strong> ${data.code}</p>
-                            <p><strong>State:</strong> ${data.state}</p>
-                            <p style="margin-top: 15px; font-weight: bold;">${data.instructions}</p>
+                        <div style="padding: 32px; background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border: 2px solid #10b981; border-radius: 20px; text-align: center;">
+                            <h3 style="color: #065f46; margin-bottom: 16px; font-size: 1.5rem;">✅ ${data.message}</h3>
+                            <p style="color: #047857; margin-bottom: 24px; font-size: 1.1rem; font-weight: 500;">${data.instructions}</p>
                             <button onclick="document.getElementById('prompt').focus()" style="
-                                background: #28a745;
+                                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
                                 color: white;
-                                padding: 10px 20px;
+                                padding: 16px 32px;
                                 border: none;
-                                border-radius: 4px;
+                                border-radius: 12px;
                                 cursor: pointer;
-                                margin-top: 10px;
-                            ">🚀 Try Your Request Now</button>
+                                font-weight: 600;
+                                font-size: 1.1rem;
+                                box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+                                transition: all 0.3s ease;
+                            " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 24px rgba(16, 185, 129, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 16px rgba(16, 185, 129, 0.3)'">🚀 Create Your Design Now</button>
                         </div>
                     `;
                     responseDiv.className = 'response-box';
@@ -324,11 +639,22 @@
                     const inputEl = document.getElementById('callbackUrlInput');
                     if (inputEl) inputEl.value = '';
                 } else {
-                    responseDiv.textContent = `Error: ${data.error}\n\nDetails: ${data.message || data.details || 'No additional details'}`;
+                    responseDiv.innerHTML = `
+                        <div style="padding: 32px; background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border: 2px solid #ef4444; border-radius: 20px; text-align: center;">
+                            <h3 style="color: #991b1b; margin-bottom: 16px; font-size: 1.5rem;">❌ Authorization Failed</h3>
+                            <p style="color: #7f1d1d; font-size: 1.1rem;">${data.error}</p>
+                            ${data.message || data.details ? `<p style="color: #7f1d1d; margin-top: 12px;">${data.message || data.details}</p>` : ''}
+                        </div>
+                    `;
                     responseDiv.className = 'response-box error';
                 }
             } catch (error) {
-                responseDiv.textContent = `Network Error: ${error.message}`;
+                responseDiv.innerHTML = `
+                    <div style="padding: 32px; background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border: 2px solid #ef4444; border-radius: 20px; text-align: center;">
+                        <h3 style="color: #991b1b; margin-bottom: 16px; font-size: 1.5rem;">🌐 Network Error</h3>
+                        <p style="color: #7f1d1d; font-size: 1.1rem;">${error.message}</p>
+                    </div>
+                `;
                 responseDiv.className = 'response-box error';
             }
         }
@@ -341,7 +667,7 @@
                     const data = await response.json();
                     serverStatus.innerHTML = `
                         <span class="status-indicator status-online"></span>
-                        Server online: ${data.message}
+                        🟢 Server Online - ${data.message}
                     `;
                 } else {
                     throw new Error('Server responded with error');
@@ -349,7 +675,7 @@
             } catch (error) {
                 serverStatus.innerHTML = `
                     <span class="status-indicator status-offline"></span>
-                    Server offline or unreachable
+                    🔴 Server Offline or Unreachable
                 `;
             }
         }
@@ -363,11 +689,11 @@
 
             // Show loading state
             submitBtn.disabled = true;
-            submitBtn.textContent = 'Sending...';
+            submitBtn.textContent = '🎨 Creating...';
             responseDiv.innerHTML = `
                 <div class="loading">
                     <div class="spinner"></div>
-                    Processing your request...
+                    <div class="loading-text">AI is crafting your design...</div>
                 </div>
             `;
             responseDiv.className = 'response-box';
@@ -387,89 +713,51 @@
                     // New server flow: show an authorize link when required
                     if (data.authorize && data.authUrl) {
                         responseDiv.innerHTML = `
-                            <div style="padding: 20px; background: #e3f2fd; border: 2px solid #2196f3; border-radius: 8px; margin: 10px 0;">
-                                <h3 style="color: #1976d2; margin-top: 0;">🔐 Authentication Required</h3>
-                                <p><strong>Message:</strong> ${data.message || 'Authorization is required to proceed.'}</p>
-                                <div style="margin: 15px 0;">
-                                    <a href="${data.authUrl}" target="_blank" rel="noopener" style="
-                                        display: inline-block;
-                                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                                        color: white;
-                                        padding: 12px 24px;
-                                        border-radius: 8px;
-                                        text-decoration: none;
-                                        font-weight: bold;
-                                        margin: 10px 0;
-                                    ">🚀 Authorize with Canva</a>
+                            <div class="auth-card">
+                                <h3>🔐 Authorization Required</h3>
+                                <p style="font-size: 1.1rem; color: #374151; margin-bottom: 24px;">${data.message || 'Please authorize with Canva to continue creating designs.'}</p>
+                                <div>
+                                    <a href="${data.authUrl}" target="_blank" rel="noopener" class="auth-btn">
+                                        🚀 Authorize with Canva
+                                    </a>
                                 </div>
-                                <p style="font-size: 14px; color: #666;">
-                                    <strong>Redirect URI:</strong> ${data.callback || 'N/A'}
+                                <p style="font-size: 0.95rem; color: #6b7280; margin: 20px 0;">
+                                    After clicking "Allow" in Canva, you may see a localhost error page. If so, copy the full URL from your browser's address bar and paste it below.
                                 </p>
-                                <p style="font-size: 12px; color: #888; margin-top: 15px;">
-                                    After authorizing, if you see an error or a localhost page, <strong>copy the full URL from the address bar</strong> (it may be <code>https://mcp.canva.com/callback?code=...</code> or <code>http://localhost:3334/callback?code=...</code>) and paste it below.
-                                 </p>
-                                 <div style="margin-top: 15px;">
-                                    <input type="text" id="callbackUrlInput" placeholder="Paste the OAuth callback URL here (mcp.canva.com/callback?... or http://localhost:3334/callback?...)" style="
-                                         width: 100%;
-                                         padding: 8px;
-                                         border: 1px solid #ddd;
-                                         border-radius: 4px;
-                                         font-size: 12px;
-                                         margin-bottom: 8px;
-                                     ">
-                                     <button onclick="submitCallbackUrl()" style="
-                                         background: #ff9800;
-                                         color: white;
-                                         padding: 8px 16px;
-                                         border: none;
-                                         border-radius: 4px;
-                                         cursor: pointer;
-                                         margin-right: 8px;
-                                     ">📝 Submit Callback URL</button>
-                                     <button onclick="document.getElementById('prompt').focus()" style="
-                                         background: #28a745;
-                                         color: white;
-                                         padding: 8px 16px;
-                                         border: none;
-                                         border-radius: 4px;
-                                         cursor: pointer;
-                                     ">↩️ Try Request Again</button>
-                                 </div>
-                             </div>
-                         `;
+                                <div style="margin-top: 24px;">
+                                    <input type="text" id="callbackUrlInput" class="callback-input" placeholder="Paste the callback URL here if you see a localhost error...">
+                                    <div class="callback-buttons">
+                                        <button onclick="submitCallbackUrl()" class="callback-btn primary">
+                                            📝 Submit URL
+                                        </button>
+                                        <button onclick="document.getElementById('prompt').focus()" class="callback-btn secondary">
+                                            ↩️ Try Again
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
                         responseDiv.className = 'response-box';
                     }
                     // Legacy path (no longer used by server, kept as fallback)
                     else if (data.automating) {
                         responseDiv.innerHTML = `
-                            <div style="padding: 20px; background: #fff3cd; border: 2px solid #ffeaa7; border-radius: 8px; margin: 10px 0;">
-                                <h3 style="color: #856404; margin-top: 0;">🤖 ${data.message}</h3>
-                                <div style="margin: 15px 0;">
-                                    <div class="loading-spinner" style="
-                                        border: 4px solid #f3f3f3;
-                                        border-top: 4px solid #856404;
-                                        border-radius: 50%;
-                                        width: 40px;
-                                        height: 40px;
-                                        animation: spin 2s linear infinite;
-                                        margin: 10px auto;
-                                    "></div>
-                                    <p style="text-align: center; color: #856404; font-weight: bold;">
-                                        Automating authorization with headless browser...
-                                    </p>
+                            <div style="padding: 40px; background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); border: 2px solid #f59e0b; border-radius: 20px; text-align: center;">
+                                <h3 style="color: #92400e; font-size: 1.5rem; margin-bottom: 20px;">🤖 ${data.message}</h3>
+                                <div class="loading">
+                                    <div class="spinner" style="border-top-color: #f59e0b;"></div>
+                                    <div class="loading-text" style="color: #92400e;">Automating authorization...</div>
                                 </div>
-                                <p style="font-size: 14px; color: #666;">
-                                    <strong>Auth URL:</strong> ${data.authUrl}
-                                </p>
                                 <button onclick="document.getElementById('prompt').focus()" style="
-                                    background: #28a745;
+                                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
                                     color: white;
-                                    padding: 8px 16px;
+                                    padding: 12px 24px;
                                     border: none;
-                                    border-radius: 4px;
+                                    border-radius: 10px;
                                     cursor: pointer;
-                                    margin-top: 10px;
-                                ">↩️ Try Request Again (After Automation)</button>
+                                    margin-top: 20px;
+                                    font-weight: 600;
+                                ">↩️ Try Request Again</button>
                             </div>
                         `;
                         responseDiv.className = 'response-box';
@@ -477,34 +765,59 @@
                         renderMcpResponse(data);
                     }
                 } else {
-                    responseDiv.textContent = `Error: ${data.error || 'Unknown error'}\n\nDetails: ${data.details || 'No additional details'}`;
+                    responseDiv.innerHTML = `
+                        <div style="padding: 32px; background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border: 2px solid #ef4444; border-radius: 20px; text-align: center;">
+                            <h3 style="color: #991b1b; margin-bottom: 16px; font-size: 1.5rem;">❌ Request Failed</h3>
+                            <p style="color: #7f1d1d; font-size: 1.1rem; margin-bottom: 12px;">${data.error || 'Unknown error occurred'}</p>
+                            ${data.details ? `<p style="color: #7f1d1d; font-size: 0.95rem;">${data.details}</p>` : ''}
+                        </div>
+                    `;
                     responseDiv.className = 'response-box error';
                 }
             } catch (error) {
-                responseDiv.textContent = `Network Error: ${error.message}\n\nThis could mean:\n- The server is down\n- Network connectivity issues\n- CORS policy blocking the request`;
+                responseDiv.innerHTML = `
+                    <div style="padding: 32px; background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border: 2px solid #ef4444; border-radius: 20px; text-align: center;">
+                        <h3 style="color: #991b1b; margin-bottom: 16px; font-size: 1.5rem;">🌐 Connection Error</h3>
+                        <p style="color: #7f1d1d; font-size: 1.1rem; margin-bottom: 12px;">${error.message}</p>
+                        <p style="color: #7f1d1d; font-size: 0.95rem;">This could indicate server downtime or network issues.</p>
+                    </div>
+                `;
                 responseDiv.className = 'response-box error';
             } finally {
                 // Reset button state
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Send Request';
+                submitBtn.textContent = '✨ Generate Design';
             }
         });
 
         // Check server status on page load
         checkServerStatus();
 
-        // Add some example prompts
-        const examples = [
-            "What can you help me with?",
-            "List available Canva design tools",
-            "Help me create a presentation",
-            "Show me design templates"
+        // Enhanced placeholder suggestions
+        const designExamples = [
+            "Create a modern business card for a tech startup",
+            "Design an Instagram post about sustainable living",
+            "Make a presentation slide about AI innovation",
+            "Create a logo for a coffee shop called 'Bean There'",
+            "Design a flyer for a yoga studio grand opening",
+            "Make a social media post for a book launch",
+            "Create a poster for a music festival",
+            "Design a LinkedIn banner for a marketing consultant"
         ];
 
-        // Add click-to-fill functionality for examples
+        // Dynamic placeholder rotation
+        let placeholderIndex = 0;
+        setInterval(() => {
+            if (!promptInput.value && document.activeElement !== promptInput) {
+                promptInput.placeholder = `Try: "${designExamples[placeholderIndex]}"`;
+                placeholderIndex = (placeholderIndex + 1) % designExamples.length;
+            }
+        }, 3000);
+
+        // Focus enhancement
         promptInput.addEventListener('focus', () => {
             if (!promptInput.value) {
-                const randomExample = examples[Math.floor(Math.random() * examples.length)];
+                const randomExample = designExamples[Math.floor(Math.random() * designExamples.length)];
                 promptInput.placeholder = `Try: "${randomExample}"`;
             }
         });
