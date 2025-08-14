@@ -253,10 +253,38 @@ app.post('/api/mcp', (req, res) => {
     let errorData = '';
     let authInProgress = false;
     let timeout;
+    let jsonBuffer = '';
+    let responded = false;
 
     mcpProcess.stdout.on('data', (data) => {
-        responseData += data.toString();
-        console.log(`MCP stdout: ${data}`);
+        const chunk = data.toString();
+        responseData += chunk;
+        jsonBuffer += chunk;
+        // Parse newline-delimited JSON responses
+        let index;
+        while ((index = jsonBuffer.indexOf('\n')) >= 0) {
+            const line = jsonBuffer.slice(0, index).trim();
+            jsonBuffer = jsonBuffer.slice(index + 1);
+            if (!line) continue;
+            try {
+                const msg = JSON.parse(line);
+                // Tool call response (id 3 per our request)
+                if (msg.id === 3 && !responded) {
+                    responded = true;
+                    if (timeout) clearTimeout(timeout);
+                    try { mcpProcess.kill(); } catch (_) {}
+                    if (!res.headersSent) {
+                        if (msg.error) {
+                            return res.status(502).json({ error: 'Tool call failed', details: msg.error, raw: msg });
+                        }
+                        return res.status(200).json({ success: true, result: msg.result ?? null, raw: msg });
+                    }
+                }
+            } catch (e) {
+                // Not a JSON line; ignore (mcp-remote logs, etc.)
+            }
+        }
+        console.log(`MCP stdout: ${chunk}`);
     });
 
     mcpProcess.stderr.on('data', (data) => {
@@ -437,7 +465,7 @@ app.post('/api/mcp', (req, res) => {
             
             console.log(`Calling Canva MCP tool:`, JSON.stringify(toolRequest));
             mcpProcess.stdin.write(JSON.stringify(toolRequest) + '\n');
-            mcpProcess.stdin.end();
+            // Keep stdin open so mcp-remote stays alive until we parse the response
         }, 100);
     }, 100);
 });
