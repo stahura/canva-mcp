@@ -216,6 +216,67 @@
         const responseDiv = document.getElementById('response');
         const serverStatus = document.getElementById('serverStatus');
 
+        function safeJsonParse(text) {
+            try {
+                return JSON.parse(text);
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function extractGeneratedDesigns(payload) {
+            // Expecting data.result.content[0].text to be a JSON string containing job.result.generated_designs
+            const textBlocks = [];
+            if (payload?.result?.content && Array.isArray(payload.result.content)) {
+                payload.result.content.forEach(c => { if (c?.type === 'text' && c.text) textBlocks.push(c.text); });
+            }
+            if (payload?.raw?.result?.content && Array.isArray(payload.raw.result.content)) {
+                payload.raw.result.content.forEach(c => { if (c?.type === 'text' && c.text) textBlocks.push(c.text); });
+            }
+            for (const t of textBlocks) {
+                const parsed = safeJsonParse(t);
+                const designs = parsed?.job?.result?.generated_designs;
+                if (Array.isArray(designs) && designs.length) return designs;
+            }
+            return null;
+        }
+
+        function renderMcpResponse(data) {
+            // Try to render generated designs nicely
+            const designs = extractGeneratedDesigns(data);
+            if (designs && designs.length) {
+                const cards = designs.map(d => {
+                    const url = d.url || '#';
+                    const thumb = d.thumbnail?.url || '';
+                    return `
+                        <a href="${url}" target="_blank" rel="noopener" style="
+                            display: block; text-decoration: none; color: inherit;">
+                            <div style="
+                                background: #fff; border: 1px solid #e1e5e9; border-radius: 10px; overflow: hidden;
+                                box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+                                ${thumb ? `<img src="${thumb}" alt="Design thumbnail" style="width:100%; height: 180px; object-fit: cover;">` : ''}
+                                <div style="padding: 10px 12px; font-weight: 600; font-size: 14px; color: #374151;">
+                                    Open design
+                                </div>
+                            </div>
+                        </a>
+                    `;
+                }).join('');
+                responseDiv.innerHTML = `
+                    <div style="margin-bottom: 8px; font-weight: 600; color: #333;">Generated designs</div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px;">
+                        ${cards}
+                    </div>
+                `;
+                responseDiv.className = 'response-box success';
+                return;
+            }
+
+            // Fallback to JSON pretty print
+            responseDiv.textContent = JSON.stringify(data, null, 2);
+            responseDiv.className = 'response-box success';
+        }
+
         async function submitCallbackUrl() {
             const callbackUrl = document.getElementById('callbackUrlInput').value.trim();
             const responseDiv = document.getElementById('response');
@@ -413,8 +474,7 @@
                         `;
                         responseDiv.className = 'response-box';
                     } else {
-                        responseDiv.textContent = data.response || JSON.stringify(data, null, 2);
-                        responseDiv.className = 'response-box success';
+                        renderMcpResponse(data);
                     }
                 } else {
                     responseDiv.textContent = `Error: ${data.error || 'Unknown error'}\n\nDetails: ${data.details || 'No additional details'}`;
