@@ -259,8 +259,9 @@
                     `;
                     responseDiv.className = 'response-box';
                     
-                    // Clear the input
-                    document.getElementById('callbackUrlInput').value = '';
+                    // Clear the input if it still exists in DOM
+                    const inputEl = document.getElementById('callbackUrlInput');
+                    if (inputEl) inputEl.value = '';
                 } else {
                     responseDiv.textContent = `Error: ${data.error}\n\nDetails: ${data.message || data.details || 'No additional details'}`;
                     responseDiv.className = 'response-box error';
