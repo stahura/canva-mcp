@@ -255,6 +255,10 @@ app.post('/api/mcp', (req, res) => {
     let timeout;
     let jsonBuffer = '';
     let responded = false;
+    let initSent = false;
+    let initDone = false;
+    let listedDone = false;
+    let toolRequestPending = null;
 
     mcpProcess.stdout.on('data', (data) => {
         const chunk = data.toString();
@@ -268,6 +272,20 @@ app.post('/api/mcp', (req, res) => {
             if (!line) continue;
             try {
                 const msg = JSON.parse(line);
+                // initialize response → then list tools
+                if (msg.id === 1 && !initDone) {
+                    initDone = true;
+                    // Send tools/list next
+                    const listReq = { jsonrpc: '2.0', id: 2, method: 'tools/list' };
+                    mcpProcess.stdin.write(JSON.stringify(listReq) + '\n');
+                }
+                // tools/list response → then call our selected tool
+                if (msg.id === 2 && !listedDone) {
+                    listedDone = true;
+                    if (toolRequestPending) {
+                        mcpProcess.stdin.write(JSON.stringify(toolRequestPending) + '\n');
+                    }
+                }
                 // Tool call response (id 3 per our request)
                 if (msg.id === 3 && !responded) {
                     responded = true;
@@ -412,62 +430,32 @@ app.post('/api/mcp', (req, res) => {
 
     console.log(`Initializing MCP connection:`, JSON.stringify(initRequest));
     mcpProcess.stdin.write(JSON.stringify(initRequest) + '\n');
+    initSent = true;
 
-    setTimeout(() => {
-        const toolRequest = {
-            jsonrpc: "2.0",
-            id: 2,
-            method: "tools/list"
+    // Prepare the tools/call request; send it only after tools/list response
+    if (prompt.toLowerCase().includes('design') || prompt.toLowerCase().includes('create')) {
+        toolRequestPending = {
+            jsonrpc: '2.0',
+            id: 3,
+            method: 'tools/call',
+            params: { name: 'generate-design', arguments: { query: prompt } }
         };
-        
-        console.log(`Listing available tools:`, JSON.stringify(toolRequest));
-        mcpProcess.stdin.write(JSON.stringify(toolRequest) + '\n');
-        
-        setTimeout(() => {
-            let toolRequest;
-            if (prompt.toLowerCase().includes('design') || prompt.toLowerCase().includes('create')) {
-                toolRequest = {
-                    jsonrpc: "2.0",
-                    id: 3,
-                    method: "tools/call",
-                    params: {
-                        name: "generate-design",
-                        arguments: {
-                            query: prompt
-                        }
-                    }
-                };
-            } else if (prompt.toLowerCase().includes('search') || prompt.toLowerCase().includes('find')) {
-                toolRequest = {
-                    jsonrpc: "2.0",
-                    id: 3,
-                    method: "tools/call",
-                    params: {
-                        name: "search-designs",
-                        arguments: {
-                            query: prompt
-                        }
-                    }
-                };
-            } else {
-                toolRequest = {
-                    jsonrpc: "2.0",
-                    id: 3,
-                    method: "tools/call",
-                    params: {
-                        name: "generate-design",
-                        arguments: {
-                            query: prompt
-                        }
-                    }
-                };
-            }
-            
-            console.log(`Calling Canva MCP tool:`, JSON.stringify(toolRequest));
-            mcpProcess.stdin.write(JSON.stringify(toolRequest) + '\n');
-            // Keep stdin open so mcp-remote stays alive until we parse the response
-        }, 100);
-    }, 100);
+    } else if (prompt.toLowerCase().includes('search') || prompt.toLowerCase().includes('find')) {
+        toolRequestPending = {
+            jsonrpc: '2.0',
+            id: 3,
+            method: 'tools/call',
+            params: { name: 'search-designs', arguments: { query: prompt } }
+        };
+    } else {
+        toolRequestPending = {
+            jsonrpc: '2.0',
+            id: 3,
+            method: 'tools/call',
+            params: { name: 'generate-design', arguments: { query: prompt } }
+        };
+    }
+    console.log(`Prepared tool call:`, JSON.stringify(toolRequestPending));
 });
 
 app.listen(PORT, () => {
