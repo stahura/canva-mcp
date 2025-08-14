@@ -6,6 +6,76 @@ const os = require('os');
 
 const app = express();
 
+// Function to parse prompt and determine design type
+function parsePromptForDesignType(prompt) {
+    const lowerPrompt = prompt.toLowerCase();
+    
+    // Multi-page design types (these create multiple pages)
+    const multiPageTypes = {
+        'presentation': ['presentation', 'slideshow', 'slides', 'pitch deck', 'deck'],
+        'document': ['document', 'doc', 'report', 'whitepaper', 'guide'],
+        'proposal': ['proposal', 'business proposal', 'project proposal'],
+        'report': ['report', 'analysis', 'study', 'research']
+    };
+    
+    // Single-page design types
+    const singlePageTypes = {
+        'instagram_post': ['instagram post', 'insta post', 'social media post'],
+        'facebook_post': ['facebook post', 'fb post'],
+        'flyer': ['flyer', 'leaflet', 'handout'],
+        'poster': ['poster', 'banner'],
+        'business_card': ['business card', 'card'],
+        'logo': ['logo', 'brand mark', 'company logo'],
+        'infographic': ['infographic', 'info graphic', 'data visualization'],
+        'invitation': ['invitation', 'invite', 'event invitation'],
+        'youtube_thumbnail': ['youtube thumbnail', 'video thumbnail', 'yt thumbnail'],
+        'youtube_banner': ['youtube banner', 'channel banner', 'yt banner']
+    };
+    
+    // Check for explicit design type mentions
+    const allTypes = { ...multiPageTypes, ...singlePageTypes };
+    
+    for (const [designType, keywords] of Object.entries(allTypes)) {
+        for (const keyword of keywords) {
+            if (lowerPrompt.includes(keyword)) {
+                // Remove the design type from the query to clean it up
+                const cleanQuery = prompt.replace(new RegExp(keyword, 'gi'), '').trim();
+                return {
+                    designType,
+                    cleanQuery: cleanQuery || prompt,
+                    isMultiPage: multiPageTypes.hasOwnProperty(designType)
+                };
+            }
+        }
+    }
+    
+    // Default inference based on content
+    if (lowerPrompt.includes('pages') || lowerPrompt.includes('slide') || 
+        lowerPrompt.includes('chapter') || lowerPrompt.includes('section')) {
+        return {
+            designType: 'presentation',
+            cleanQuery: prompt,
+            isMultiPage: true
+        };
+    }
+    
+    // Default to presentation for multi-page requests
+    if (lowerPrompt.match(/\b(\d+)\s*(page|slide)/)) {
+        return {
+            designType: 'presentation',
+            cleanQuery: prompt,
+            isMultiPage: true
+        };
+    }
+    
+    // No specific type detected
+    return {
+        designType: null,
+        cleanQuery: prompt,
+        isMultiPage: false
+    };
+}
+
 // Function to ensure Canva CLI credentials exist
 function ensureCanvaCredentials() {
     const credentialsDir = path.join(os.homedir(), '.canva-cli');
@@ -433,14 +503,7 @@ app.post('/api/mcp', (req, res) => {
     initSent = true;
 
     // Prepare the tools/call request; send it only after tools/list response
-    if (prompt.toLowerCase().includes('design') || prompt.toLowerCase().includes('create')) {
-        toolRequestPending = {
-            jsonrpc: '2.0',
-            id: 3,
-            method: 'tools/call',
-            params: { name: 'generate-design', arguments: { query: prompt } }
-        };
-    } else if (prompt.toLowerCase().includes('search') || prompt.toLowerCase().includes('find')) {
+    if (prompt.toLowerCase().includes('search') || prompt.toLowerCase().includes('find')) {
         toolRequestPending = {
             jsonrpc: '2.0',
             id: 3,
@@ -448,12 +511,23 @@ app.post('/api/mcp', (req, res) => {
             params: { name: 'search-designs', arguments: { query: prompt } }
         };
     } else {
+        // Parse prompt for design type and create enhanced arguments
+        const designTypeInfo = parsePromptForDesignType(prompt);
+        const toolArgs = { query: designTypeInfo.cleanQuery };
+        
+        // Add design_type if detected
+        if (designTypeInfo.designType) {
+            toolArgs.design_type = designTypeInfo.designType;
+        }
+        
         toolRequestPending = {
             jsonrpc: '2.0',
             id: 3,
             method: 'tools/call',
-            params: { name: 'generate-design', arguments: { query: prompt } }
+            params: { name: 'generate-design', arguments: toolArgs }
         };
+        
+        console.log(`Detected design type: ${designTypeInfo.designType || 'none'}, Multi-page: ${designTypeInfo.isMultiPage}`);
     }
     console.log(`Prepared tool call:`, JSON.stringify(toolRequestPending));
 });
